@@ -42,6 +42,28 @@ describe("ProviderSessionStartInput", () => {
       }),
     ).toThrow();
   });
+
+  it("accepts copilot-compatible payloads", () => {
+    const parsed = decodeProviderSessionStartInput({
+      threadId: "thread-2",
+      provider: "copilot",
+      cwd: "/tmp/workspace",
+      model: "gpt-4.1",
+      runtimeMode: "approval-required",
+      providerOptions: {
+        copilot: {
+          cliPath: "/usr/local/bin/copilot",
+          configDir: "/tmp/.copilot",
+          githubToken: "ghu_test_token",
+        },
+      },
+    });
+
+    expect(parsed.provider).toBe("copilot");
+    expect(parsed.providerOptions?.copilot?.cliPath).toBe("/usr/local/bin/copilot");
+    expect(parsed.providerOptions?.copilot?.configDir).toBe("/tmp/.copilot");
+    expect(parsed.runtimeMode).toBe("approval-required");
+  });
 });
 
 describe("ProviderSendTurnInput", () => {

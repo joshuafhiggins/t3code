@@ -66,7 +66,9 @@ it.layer(makeDirectoryLayer(SqlitePersistenceMemory))("ProviderSessionDirectoryL
         assert.equal(updatedBinding.value.threadId, nextThreadId);
       }
 
-      const runtime = yield* runtimeRepository.getByThreadId({ threadId: nextThreadId });
+      const runtime = yield* runtimeRepository.getByThreadId({
+        threadId: nextThreadId,
+      });
       assert.equal(Option.isSome(runtime), true);
       if (Option.isSome(runtime)) {
         assert.equal(runtime.value.threadId, nextThreadId);
@@ -200,6 +202,37 @@ it.layer(makeDirectoryLayer(SqlitePersistenceMemory))("ProviderSessionDirectoryL
           WHERE type = 'table' AND name = 'provider_sessions'
         `;
         assert.equal(legacyTableRows.length, 0);
+      }).pipe(Effect.provide(directoryLayer));
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }));
+
+  it("rehydrates persisted copilot mappings across layer restart", () =>
+    Effect.gen(function* () {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "t3-provider-directory-copilot-"));
+      const dbPath = path.join(tempDir, "orchestration.sqlite");
+      const directoryLayer = makeDirectoryLayer(makeSqlitePersistenceLive(dbPath));
+
+      const threadId = ThreadId.makeUnsafe("thread-copilot-restart");
+
+      yield* Effect.gen(function* () {
+        const directory = yield* ProviderSessionDirectory;
+        yield* directory.upsert({
+          provider: "copilot",
+          threadId,
+        });
+      }).pipe(Effect.provide(directoryLayer));
+
+      yield* Effect.gen(function* () {
+        const directory = yield* ProviderSessionDirectory;
+        const provider = yield* directory.getProvider(threadId);
+        assert.equal(provider, "copilot");
+
+        const resolvedBinding = yield* directory.getBinding(threadId);
+        assertSome(resolvedBinding, {
+          threadId,
+          provider: "copilot",
+        });
       }).pipe(Effect.provide(directoryLayer));
 
       fs.rmSync(tempDir, { recursive: true, force: true });

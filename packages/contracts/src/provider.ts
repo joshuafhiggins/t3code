@@ -52,8 +52,15 @@ const CodexProviderStartOptions = Schema.Struct({
   homePath: Schema.optional(TrimmedNonEmptyStringSchema),
 });
 
+const CopilotProviderStartOptions = Schema.Struct({
+  cliPath: Schema.optional(TrimmedNonEmptyStringSchema),
+  configDir: Schema.optional(TrimmedNonEmptyStringSchema),
+  githubToken: Schema.optional(TrimmedNonEmptyStringSchema),
+});
+
 export const ProviderStartOptions = Schema.Struct({
   codex: Schema.optional(CodexProviderStartOptions),
+  copilot: Schema.optional(CopilotProviderStartOptions),
 });
 export type ProviderStartOptions = typeof ProviderStartOptions.Type;
 

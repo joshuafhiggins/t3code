@@ -14,6 +14,8 @@ describe("normalizeModelSlug", () => {
   it("maps known aliases to canonical slugs", () => {
     expect(normalizeModelSlug("5.3")).toBe("gpt-5.3-codex");
     expect(normalizeModelSlug("gpt-5.3")).toBe("gpt-5.3-codex");
+    expect(normalizeModelSlug("sonnet", "copilot")).toBe("claude-sonnet-4.6");
+    expect(normalizeModelSlug("gemini", "copilot")).toBe("gemini-3.1-pro");
   });
 
   it("returns null for empty or missing values", () => {
@@ -26,6 +28,7 @@ describe("normalizeModelSlug", () => {
   it("preserves non-aliased model slugs", () => {
     expect(normalizeModelSlug("gpt-5.2")).toBe("gpt-5.2");
     expect(normalizeModelSlug("gpt-5.2-codex")).toBe("gpt-5.2-codex");
+    expect(normalizeModelSlug("gpt-4.1", "copilot")).toBe("gpt-4.1");
   });
 
   it("does not leak prototype properties as aliases", () => {
@@ -49,16 +52,31 @@ describe("resolveModelSlug", () => {
     for (const model of MODEL_OPTIONS_BY_PROVIDER.codex) {
       expect(resolveModelSlug(model.slug)).toBe(model.slug);
     }
+    for (const model of MODEL_OPTIONS_BY_PROVIDER.copilot) {
+      expect(resolveModelSlug(model.slug, "copilot")).toBe(model.slug);
+    }
   });
   it("keeps codex defaults for backward compatibility", () => {
     expect(getDefaultModel()).toBe(DEFAULT_MODEL_BY_PROVIDER.codex);
     expect(getModelOptions()).toEqual(MODEL_OPTIONS_BY_PROVIDER.codex);
+  });
+
+  it("returns the copilot provider defaults when requested", () => {
+    expect(getDefaultModel("copilot")).toBe(DEFAULT_MODEL_BY_PROVIDER.copilot);
+    expect(getModelOptions("copilot")).toEqual(MODEL_OPTIONS_BY_PROVIDER.copilot);
+    expect(
+      getModelOptions("copilot").some((option) => option.slug === getDefaultModel("copilot")),
+    ).toBe(true);
   });
 });
 
 describe("getReasoningEffortOptions", () => {
   it("returns codex reasoning options for codex", () => {
     expect(getReasoningEffortOptions("codex")).toEqual(["xhigh", "high", "medium", "low"]);
+  });
+
+  it("returns provider reasoning options for copilot", () => {
+    expect(getReasoningEffortOptions("copilot")).toEqual(["xhigh", "high", "medium", "low"]);
   });
 });
 

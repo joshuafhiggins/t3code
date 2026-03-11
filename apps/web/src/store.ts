@@ -189,20 +189,27 @@ function toLegacySessionStatus(
 }
 
 function toLegacyProvider(providerName: string | null): ProviderKind {
-  if (providerName === "codex") {
+  if (providerName === "codex" || providerName === "copilot") {
     return providerName;
   }
   return "codex";
 }
 
 const CODEX_MODEL_SLUGS = new Set<string>(getModelOptions("codex").map((option) => option.slug));
+const COPILOT_MODEL_SLUGS = new Set<string>(
+  getModelOptions("copilot").map((option) => option.slug),
+);
 
 function inferProviderForThreadModel(input: {
   readonly model: string;
   readonly sessionProviderName: string | null;
 }): ProviderKind {
-  if (input.sessionProviderName === "codex") {
+  if (input.sessionProviderName === "codex" || input.sessionProviderName === "copilot") {
     return input.sessionProviderName;
+  }
+  const normalizedCopilot = normalizeModelSlug(input.model, "copilot");
+  if (normalizedCopilot && COPILOT_MODEL_SLUGS.has(normalizedCopilot)) {
+    return "copilot";
   }
   const normalizedCodex = normalizeModelSlug(input.model, "codex");
   if (normalizedCodex && CODEX_MODEL_SLUGS.has(normalizedCodex)) {
