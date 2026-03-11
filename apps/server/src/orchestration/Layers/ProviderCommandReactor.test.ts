@@ -96,7 +96,7 @@ describe("ProviderCommandReactor", () => {
         typeof input === "object" &&
         input !== null &&
         "provider" in input &&
-        input.provider === "codex"
+        (input.provider === "codex" || input.provider === "copilot")
           ? input.provider
           : "codex";
       const resumeCursor =
@@ -519,6 +519,70 @@ describe("ProviderCommandReactor", () => {
     const readModel = await Effect.runPromise(harness.engine.getReadModel());
     const thread = readModel.threads.find((entry) => entry.id === ThreadId.makeUnsafe("thread-1"));
     expect(thread?.session?.threadId).toBe("thread-1");
+    expect(thread?.session?.runtimeMode).toBe("approval-required");
+  });
+
+  it("preserves copilot as the provider when restarting an existing thread session", async () => {
+    const harness = await createHarness();
+    const now = new Date().toISOString();
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.runtime-mode.set",
+        commandId: CommandId.makeUnsafe("cmd-runtime-mode-set-copilot-initial"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        runtimeMode: "full-access",
+        createdAt: now,
+      }),
+    );
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.makeUnsafe("cmd-turn-start-copilot-initial"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        message: {
+          messageId: asMessageId("user-message-copilot-initial"),
+          role: "user",
+          text: "first copilot turn",
+          attachments: [],
+        },
+        provider: "copilot",
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "full-access",
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.startSession.mock.calls.length === 1);
+    await waitFor(() => harness.sendTurn.mock.calls.length === 1);
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.runtime-mode.set",
+        commandId: CommandId.makeUnsafe("cmd-runtime-mode-set-copilot-restart"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        runtimeMode: "approval-required",
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.startSession.mock.calls.length === 2);
+
+    expect(harness.startSession.mock.calls[0]?.[1]).toMatchObject({
+      provider: "copilot",
+      runtimeMode: "full-access",
+    });
+    expect(harness.startSession.mock.calls[1]?.[1]).toMatchObject({
+      threadId: ThreadId.makeUnsafe("thread-1"),
+      provider: "copilot",
+      resumeCursor: { opaque: "cursor-1" },
+      runtimeMode: "approval-required",
+    });
+
+    const readModel = await Effect.runPromise(harness.engine.getReadModel());
+    const thread = readModel.threads.find((entry) => entry.id === ThreadId.makeUnsafe("thread-1"));
+    expect(thread?.session?.providerName).toBe("copilot");
     expect(thread?.session?.runtimeMode).toBe("approval-required");
   });
 
