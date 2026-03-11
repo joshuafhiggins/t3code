@@ -1884,8 +1884,14 @@ export default function ChatView({ threadId }: ChatViewProps) {
 
   const resetSendPhase = useCallback(() => {
     setSendPhase("idle");
-    setSendStartedAt(null);
   }, []);
+
+  useEffect(() => {
+    if (isWorking) {
+      return;
+    }
+    setSendStartedAt(null);
+  }, [isWorking]);
 
   useEffect(() => {
     if (sendPhase === "idle") {

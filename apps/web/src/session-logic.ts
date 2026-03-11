@@ -149,7 +149,21 @@ export function deriveActiveWorkStartedAt(
 	sendStartedAt: string | null,
 ): string | null {
 	if (!isLatestTurnSettled(latestTurn, session)) {
-		return latestTurn?.startedAt ?? sendStartedAt;
+		if (!latestTurn?.startedAt) {
+			return sendStartedAt;
+		}
+
+		const latestCompletedAt = latestTurn.completedAt ? Date.parse(latestTurn.completedAt) : NaN;
+		const localSendStartedAt = sendStartedAt ? Date.parse(sendStartedAt) : NaN;
+		if (
+			Number.isFinite(latestCompletedAt) &&
+			Number.isFinite(localSendStartedAt) &&
+			localSendStartedAt > latestCompletedAt
+		) {
+			return sendStartedAt;
+		}
+
+		return latestTurn.startedAt;
 	}
 	return sendStartedAt;
 }
