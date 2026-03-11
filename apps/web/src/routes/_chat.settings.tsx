@@ -48,6 +48,13 @@ const MODEL_PROVIDER_SETTINGS: Array<{
     placeholder: "your-codex-model-slug",
     example: "gpt-6.7-codex-ultra-preview",
   },
+  {
+    provider: "copilot",
+    title: "GitHub Copilot",
+    description: "Save additional GitHub Copilot model slugs for the picker and `/model` command.",
+    placeholder: "your-copilot-model-slug",
+    example: "o3-mini",
+  },
 ] as const;
 
 function getCustomModelsForProvider(
@@ -55,6 +62,8 @@ function getCustomModelsForProvider(
   provider: ProviderKind,
 ) {
   switch (provider) {
+    case "copilot":
+      return settings.customCopilotModels;
     case "codex":
     default:
       return settings.customCodexModels;
@@ -66,6 +75,8 @@ function getDefaultCustomModelsForProvider(
   provider: ProviderKind,
 ) {
   switch (provider) {
+    case "copilot":
+      return defaults.customCopilotModels;
     case "codex":
     default:
       return defaults.customCodexModels;
@@ -74,6 +85,8 @@ function getDefaultCustomModelsForProvider(
 
 function patchCustomModels(provider: ProviderKind, models: string[]) {
   switch (provider) {
+    case "copilot":
+      return { customCopilotModels: models };
     case "codex":
     default:
       return { customCodexModels: models };
@@ -90,6 +103,7 @@ function SettingsRouteView() {
     Record<ProviderKind, string>
   >({
     codex: "",
+    copilot: "",
   });
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
     Partial<Record<ProviderKind, string | null>>

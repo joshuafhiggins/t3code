@@ -49,7 +49,12 @@ export function createDebouncedStorage(baseStorage: StateStorage): DebouncedStor
 const composerDebouncedStorage: DebouncedStorage =
   typeof localStorage !== "undefined"
     ? createDebouncedStorage(localStorage)
-    : { getItem: () => null, setItem: () => {}, removeItem: () => {}, flush: () => {} };
+    : {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+        flush: () => {},
+      };
 
 // Flush pending composer draft writes before page unload to prevent data loss.
 if (typeof window !== "undefined") {
@@ -246,7 +251,7 @@ function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
 }
 
 function normalizeProviderKind(value: unknown): ProviderKind | null {
-  return value === "codex" ? value : null;
+  return value === "codex" || value === "copilot" ? value : null;
 }
 
 function revokeObjectPreviewUrl(previewUrl: string): void {
@@ -386,7 +391,11 @@ function normalizePersistedComposerDraftState(value: unknown): PersistedComposer
     }
   }
   if (!rawDraftMap || typeof rawDraftMap !== "object") {
-    return { draftsByThreadId: {}, draftThreadsByThreadId, projectDraftThreadIdByProjectId };
+    return {
+      draftsByThreadId: {},
+      draftThreadsByThreadId,
+      projectDraftThreadIdByProjectId,
+    };
   }
   const nextDraftsByThreadId: PersistedComposerDraftStoreState["draftsByThreadId"] = {};
   for (const [threadId, draftValue] of Object.entries(rawDraftMap as Record<string, unknown>)) {
@@ -848,9 +857,10 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
         if (threadId.length === 0) {
           return;
         }
-        const normalizedModel = normalizeModelSlug(model) ?? null;
         set((state) => {
           const existing = state.draftsByThreadId[threadId];
+          const provider = existing?.provider ?? "codex";
+          const normalizedModel = normalizeModelSlug(model, provider) ?? null;
           if (!existing && normalizedModel === null) {
             return state;
           }

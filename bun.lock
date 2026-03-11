@@ -50,6 +50,7 @@
       "dependencies": {
         "@effect/platform-node": "catalog:",
         "@effect/sql-sqlite-bun": "catalog:",
+        "@github/copilot-sdk": "^0.1.32",
         "@pierre/diffs": "^1.1.0-beta.16",
         "effect": "catalog:",
         "node-pty": "^1.1.0",
@@ -349,6 +350,22 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.8", "", { "dependencies": { "@floating-ui/dom": "^1.7.6" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-cC52bHwM/n/CxS87FH0yWdngEZrjdtLW/qVruo68qg+prK7ZQ4YGdut2GyDVpoGeAYe/h899rVeOVm6Oi40k2A=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
+
+    "@github/copilot": ["@github/copilot@1.0.3", "", { "optionalDependencies": { "@github/copilot-darwin-arm64": "1.0.3", "@github/copilot-darwin-x64": "1.0.3", "@github/copilot-linux-arm64": "1.0.3", "@github/copilot-linux-x64": "1.0.3", "@github/copilot-win32-arm64": "1.0.3", "@github/copilot-win32-x64": "1.0.3" }, "bin": { "copilot": "npm-loader.js" } }, "sha512-5J68wbShQq8biIgHD3ixlEg9hdj4kE72L2U7VwNXnhQ6tJNJtnXPHIyNbcc4L5ncu3k7IRmHMquJ76OApwvHxA=="],
+
+    "@github/copilot-darwin-arm64": ["@github/copilot-darwin-arm64@1.0.3", "", { "os": "darwin", "cpu": "arm64", "bin": { "copilot-darwin-arm64": "copilot" } }, "sha512-gWeMjR6yP+F1SIY4RNm54C35ryYEyOg8ejOyM3lO3I9Xbq9IzBFCdOxhXSSeNPz6x1VF3vOIh/sxLPIOL1Y/Gg=="],
+
+    "@github/copilot-darwin-x64": ["@github/copilot-darwin-x64@1.0.3", "", { "os": "darwin", "cpu": "x64", "bin": { "copilot-darwin-x64": "copilot" } }, "sha512-kPvMctqiPW6Jq8yxxgbGzYvgtOj9U7Hk8MJknt+9nhrf/duvUobWuYJ6/FivMowGisYYtDbGjknM351vOUC7qA=="],
+
+    "@github/copilot-linux-arm64": ["@github/copilot-linux-arm64@1.0.3", "", { "os": "linux", "cpu": "arm64", "bin": { "copilot-linux-arm64": "copilot" } }, "sha512-AVveXRt3QKXSCYIbHTQABLRw4MbmJeRxZgHrR2h3qHMmpUkXf5dM+9Ott12LPENILU962w3kB/j1Q+QqJUhAUw=="],
+
+    "@github/copilot-linux-x64": ["@github/copilot-linux-x64@1.0.3", "", { "os": "linux", "cpu": "x64", "bin": { "copilot-linux-x64": "copilot" } }, "sha512-adCgNMBeeMqs3C0jumjv/ewIvBo37b3QGFSm21pBpvZIA9Td9gZXVF4+1uBMeUrOLy/8okNGuO7ao9r8jhrR5g=="],
+
+    "@github/copilot-sdk": ["@github/copilot-sdk@0.1.32", "", { "dependencies": { "@github/copilot": "^1.0.2", "vscode-jsonrpc": "^8.2.1", "zod": "^4.3.6" } }, "sha512-mPWM0fw1Gqc/SW8nl45K8abrFH+92fO7y6tRtRl5imjS5hGapLf/dkX5WDrgPtlsflD0c41lFXVUri5NVJwtoA=="],
+
+    "@github/copilot-win32-arm64": ["@github/copilot-win32-arm64@1.0.3", "", { "os": "win32", "cpu": "arm64", "bin": { "copilot-win32-arm64": "copilot.exe" } }, "sha512-vmHkjwzr4VZFOTE17n5GxL2qP9GPr6Z39xzdtLfGnv1uJOIk1UPKdpzBUoFNVTumtz0I0ZnRPJI1jF+MgKiafQ=="],
+
+    "@github/copilot-win32-x64": ["@github/copilot-win32-x64@1.0.3", "", { "os": "win32", "cpu": "x64", "bin": { "copilot-win32-x64": "copilot.exe" } }, "sha512-hIbzYdpXuM6PoSTS4NX8UOlbOPwCJ7bSsAe8JvJdo7lRv6Fcj4Xj/ZQmC9gDsiTZxBL2aIxQtn0WVYLFWnvMjQ=="],
 
     "@hapi/address": ["@hapi/address@5.1.1", "", { "dependencies": { "@hapi/hoek": "^11.0.2" } }, "sha512-A+po2d/dVoY7cYajycYI43ZbYMXukuopIsqCjh5QzsBCipDtdofHntljDlpccMjIfTy6UOkg+5KPriwYch2bXA=="],
 
@@ -1884,7 +1901,7 @@
 
     "vscode-json-languageservice": ["vscode-json-languageservice@4.1.8", "", { "dependencies": { "jsonc-parser": "^3.0.0", "vscode-languageserver-textdocument": "^1.0.1", "vscode-languageserver-types": "^3.16.0", "vscode-nls": "^5.0.0", "vscode-uri": "^3.0.2" } }, "sha512-0vSpg6Xd9hfV+eZAaYN63xVVMOTmJ4GgHxXnkLCh+9RsQBkWKIghzLhW2B9ebfG+LQQg8uLtsQ2aUKjTgE+QOg=="],
 
-    "vscode-jsonrpc": ["vscode-jsonrpc@8.2.0", "", {}, "sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA=="],
+    "vscode-jsonrpc": ["vscode-jsonrpc@8.2.1", "", {}, "sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ=="],
 
     "vscode-languageserver": ["vscode-languageserver@9.0.1", "", { "dependencies": { "vscode-languageserver-protocol": "3.17.5" }, "bin": { "installServerIntoExtension": "bin/installServerIntoExtension" } }, "sha512-woByF3PDpkHFUreUa7Hos7+pUWdeWMXRd26+ZX2A8cFx6v/JPTtd4/uN0/jB6XQHYaOlHbio03NTHCqrgG5n7g=="],
 
@@ -1992,6 +2009,8 @@
 
     "@electron/get/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
+    "@github/copilot-sdk/zod": ["zod@4.3.6", "", {}, "sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg=="],
+
     "@inquirer/core/wrap-ansi": ["wrap-ansi@6.2.0", "", { "dependencies": { "ansi-styles": "^4.0.0", "string-width": "^4.1.0", "strip-ansi": "^6.0.0" } }, "sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA=="],
 
     "@rollup/pluginutils/estree-walker": ["estree-walker@2.0.2", "", {}, "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w=="],
@@ -2071,6 +2090,8 @@
     "vite/rolldown": ["rolldown@1.0.0-rc.8", "", { "dependencies": { "@oxc-project/types": "=0.115.0", "@rolldown/pluginutils": "1.0.0-rc.8" }, "optionalDependencies": { "@rolldown/binding-android-arm64": "1.0.0-rc.8", "@rolldown/binding-darwin-arm64": "1.0.0-rc.8", "@rolldown/binding-darwin-x64": "1.0.0-rc.8", "@rolldown/binding-freebsd-x64": "1.0.0-rc.8", "@rolldown/binding-linux-arm-gnueabihf": "1.0.0-rc.8", "@rolldown/binding-linux-arm64-gnu": "1.0.0-rc.8", "@rolldown/binding-linux-arm64-musl": "1.0.0-rc.8", "@rolldown/binding-linux-ppc64-gnu": "1.0.0-rc.8", "@rolldown/binding-linux-s390x-gnu": "1.0.0-rc.8", "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.8", "@rolldown/binding-linux-x64-musl": "1.0.0-rc.8", "@rolldown/binding-openharmony-arm64": "1.0.0-rc.8", "@rolldown/binding-wasm32-wasi": "1.0.0-rc.8", "@rolldown/binding-win32-arm64-msvc": "1.0.0-rc.8", "@rolldown/binding-win32-x64-msvc": "1.0.0-rc.8" }, "bin": { "rolldown": "bin/cli.mjs" } }, "sha512-RGOL7mz/aoQpy/y+/XS9iePBfeNRDUdozrhCEJxdpJyimW8v6yp4c30q6OviUU5AnUJVLRL9GP//HUs6N3ALrQ=="],
 
     "vscode-json-languageservice/jsonc-parser": ["jsonc-parser@3.3.1", "", {}, "sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ=="],
+
+    "vscode-languageserver-protocol/vscode-jsonrpc": ["vscode-jsonrpc@8.2.0", "", {}, "sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA=="],
 
     "widest-line/string-width": ["string-width@7.2.0", "", { "dependencies": { "emoji-regex": "^10.3.0", "get-east-asian-width": "^1.0.0", "strip-ansi": "^7.1.0" } }, "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="],
 

@@ -140,6 +140,27 @@ it.effect("preserves explicit provider and runtime mode in thread.turn.start", (
   }),
 );
 
+it.effect("accepts copilot as a provider in thread.turn.start", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decodeThreadTurnStartCommand({
+      type: "thread.turn.start",
+      commandId: "cmd-turn-copilot",
+      threadId: "thread-1",
+      message: {
+        messageId: "msg-copilot",
+        role: "user",
+        text: "hello",
+        attachments: [],
+      },
+      provider: "copilot",
+      model: "gpt-4.1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    assert.strictEqual(parsed.provider, "copilot");
+    assert.strictEqual(parsed.model, "gpt-4.1");
+  }),
+);
+
 it.effect("decodes thread.created runtime mode for historical events", () =>
   Effect.gen(function* () {
     const parsed = yield* decodeThreadCreatedPayload({
