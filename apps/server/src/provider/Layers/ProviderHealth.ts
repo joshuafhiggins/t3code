@@ -9,22 +9,38 @@
  * @module ProviderHealthLive
  */
 import * as OS from "node:os";
-import type { GetAuthStatusResponse, GetStatusResponse } from "@github/copilot-sdk";
 import type {
-  ServerProviderAuthStatus,
-  ServerProviderStatus,
-  ServerProviderStatusState,
+	GetAuthStatusResponse,
+	GetStatusResponse,
+} from "@github/copilot-sdk";
+import type {
+	ServerProviderAuthStatus,
+	ServerProviderStatus,
+	ServerProviderStatusState,
 } from "@t3tools/contracts";
-import { Data, Effect, Fiber, FileSystem, Layer, Option, Path, Result, Stream } from "effect";
+import {
+	Data,
+	Effect,
+	Fiber,
+	FileSystem,
+	Layer,
+	Option,
+	Path,
+	Result,
+	Stream,
+} from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import {
-  formatCodexCliUpgradeMessage,
-  isCodexCliVersionSupported,
-  parseCodexCliVersion,
+	formatCodexCliUpgradeMessage,
+	isCodexCliVersionSupported,
+	parseCodexCliVersion,
 } from "../codexCliVersion";
 import { createCopilotClient } from "../copilotClient.ts";
-import { ProviderHealth, type ProviderHealthShape } from "../Services/ProviderHealth";
+import {
+	ProviderHealth,
+	type ProviderHealthShape,
+} from "../Services/ProviderHealth";
 
 const DEFAULT_TIMEOUT_MS = 4_000;
 const CODEX_PROVIDER = "codex" as const;
@@ -33,164 +49,174 @@ const COPILOT_PROVIDER = "copilot" as const;
 // ── Pure helpers ────────────────────────────────────────────────────
 
 export interface CommandResult {
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly code: number;
+	readonly stdout: string;
+	readonly stderr: string;
+	readonly code: number;
 }
 
-class CopilotHealthCheckError extends Data.TaggedError("CopilotHealthCheckError")<{
-  readonly message: string;
-  readonly cause: unknown;
+class CopilotHealthCheckError extends Data.TaggedError(
+	"CopilotHealthCheckError",
+)<{
+	readonly message: string;
+	readonly cause: unknown;
 }> {}
 
 function nonEmptyTrimmed(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function isCommandMissingCause(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const lower = error.message.toLowerCase();
-  return (
-    lower.includes("command not found: codex") ||
-    lower.includes("spawn codex enoent") ||
-    lower.includes("enoent") ||
-    lower.includes("notfound")
-  );
+	if (!(error instanceof Error)) return false;
+	const lower = error.message.toLowerCase();
+	return (
+		lower.includes("command not found: codex") ||
+		lower.includes("spawn codex enoent") ||
+		lower.includes("enoent") ||
+		lower.includes("notfound")
+	);
 }
 
 function detailFromResult(
-  result: CommandResult & { readonly timedOut?: boolean },
+	result: CommandResult & { readonly timedOut?: boolean },
 ): string | undefined {
-  if (result.timedOut) return "Timed out while running command.";
-  const stderr = nonEmptyTrimmed(result.stderr);
-  if (stderr) return stderr;
-  const stdout = nonEmptyTrimmed(result.stdout);
-  if (stdout) return stdout;
-  if (result.code !== 0) {
-    return `Command exited with code ${result.code}.`;
-  }
-  return undefined;
+	if (result.timedOut) return "Timed out while running command.";
+	const stderr = nonEmptyTrimmed(result.stderr);
+	if (stderr) return stderr;
+	const stdout = nonEmptyTrimmed(result.stdout);
+	if (stdout) return stdout;
+	if (result.code !== 0) {
+		return `Command exited with code ${result.code}.`;
+	}
+	return undefined;
 }
 
 function extractAuthBoolean(value: unknown): boolean | undefined {
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      const nested = extractAuthBoolean(entry);
-      if (nested !== undefined) return nested;
-    }
-    return undefined;
-  }
+	if (Array.isArray(value)) {
+		for (const entry of value) {
+			const nested = extractAuthBoolean(entry);
+			if (nested !== undefined) return nested;
+		}
+		return undefined;
+	}
 
-  if (!value || typeof value !== "object") return undefined;
+	if (!value || typeof value !== "object") return undefined;
 
-  const record = value as Record<string, unknown>;
-  for (const key of ["authenticated", "isAuthenticated", "loggedIn", "isLoggedIn"] as const) {
-    if (typeof record[key] === "boolean") return record[key];
-  }
-  for (const key of ["auth", "status", "session", "account"] as const) {
-    const nested = extractAuthBoolean(record[key]);
-    if (nested !== undefined) return nested;
-  }
-  return undefined;
+	const record = value as Record<string, unknown>;
+	for (const key of [
+		"authenticated",
+		"isAuthenticated",
+		"loggedIn",
+		"isLoggedIn",
+	] as const) {
+		if (typeof record[key] === "boolean") return record[key];
+	}
+	for (const key of ["auth", "status", "session", "account"] as const) {
+		const nested = extractAuthBoolean(record[key]);
+		if (nested !== undefined) return nested;
+	}
+	return undefined;
 }
 
 export function parseAuthStatusFromOutput(result: CommandResult): {
-  readonly status: ServerProviderStatusState;
-  readonly authStatus: ServerProviderAuthStatus;
-  readonly message?: string;
+	readonly status: ServerProviderStatusState;
+	readonly authStatus: ServerProviderAuthStatus;
+	readonly message?: string;
 } {
-  const lowerOutput = `${result.stdout}\n${result.stderr}`.toLowerCase();
+	const lowerOutput = `${result.stdout}\n${result.stderr}`.toLowerCase();
 
-  if (
-    lowerOutput.includes("unknown command") ||
-    lowerOutput.includes("unrecognized command") ||
-    lowerOutput.includes("unexpected argument")
-  ) {
-    return {
-      status: "warning",
-      authStatus: "unknown",
-      message: "Codex CLI authentication status command is unavailable in this Codex version.",
-    };
-  }
+	if (
+		lowerOutput.includes("unknown command") ||
+		lowerOutput.includes("unrecognized command") ||
+		lowerOutput.includes("unexpected argument")
+	) {
+		return {
+			status: "warning",
+			authStatus: "unknown",
+			message:
+				"Codex CLI authentication status command is unavailable in this Codex version.",
+		};
+	}
 
-  if (
-    lowerOutput.includes("not logged in") ||
-    lowerOutput.includes("login required") ||
-    lowerOutput.includes("authentication required") ||
-    lowerOutput.includes("run `codex login`") ||
-    lowerOutput.includes("run codex login")
-  ) {
-    return {
-      status: "error",
-      authStatus: "unauthenticated",
-      message: "Codex CLI is not authenticated. Run `codex login` and try again.",
-    };
-  }
+	if (
+		lowerOutput.includes("not logged in") ||
+		lowerOutput.includes("login required") ||
+		lowerOutput.includes("authentication required") ||
+		lowerOutput.includes("run `codex login`") ||
+		lowerOutput.includes("run codex login")
+	) {
+		return {
+			status: "error",
+			authStatus: "unauthenticated",
+			message:
+				"Codex CLI is not authenticated. Run `codex login` and try again.",
+		};
+	}
 
-  const parsedAuth = (() => {
-    const trimmed = result.stdout.trim();
-    if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
-      return {
-        attemptedJsonParse: false as const,
-        auth: undefined as boolean | undefined,
-      };
-    }
-    try {
-      return {
-        attemptedJsonParse: true as const,
-        auth: extractAuthBoolean(JSON.parse(trimmed)),
-      };
-    } catch {
-      return {
-        attemptedJsonParse: false as const,
-        auth: undefined as boolean | undefined,
-      };
-    }
-  })();
+	const parsedAuth = (() => {
+		const trimmed = result.stdout.trim();
+		if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
+			return {
+				attemptedJsonParse: false as const,
+				auth: undefined as boolean | undefined,
+			};
+		}
+		try {
+			return {
+				attemptedJsonParse: true as const,
+				auth: extractAuthBoolean(JSON.parse(trimmed)),
+			};
+		} catch {
+			return {
+				attemptedJsonParse: false as const,
+				auth: undefined as boolean | undefined,
+			};
+		}
+	})();
 
-  if (parsedAuth.auth === true) {
-    return { status: "ready", authStatus: "authenticated" };
-  }
-  if (parsedAuth.auth === false) {
-    return {
-      status: "error",
-      authStatus: "unauthenticated",
-      message: "Codex CLI is not authenticated. Run `codex login` and try again.",
-    };
-  }
-  if (parsedAuth.attemptedJsonParse) {
-    return {
-      status: "warning",
-      authStatus: "unknown",
-      message:
-        "Could not verify Codex authentication status from JSON output (missing auth marker).",
-    };
-  }
-  if (result.code === 0) {
-    return { status: "ready", authStatus: "authenticated" };
-  }
+	if (parsedAuth.auth === true) {
+		return { status: "ready", authStatus: "authenticated" };
+	}
+	if (parsedAuth.auth === false) {
+		return {
+			status: "error",
+			authStatus: "unauthenticated",
+			message:
+				"Codex CLI is not authenticated. Run `codex login` and try again.",
+		};
+	}
+	if (parsedAuth.attemptedJsonParse) {
+		return {
+			status: "warning",
+			authStatus: "unknown",
+			message:
+				"Could not verify Codex authentication status from JSON output (missing auth marker).",
+		};
+	}
+	if (result.code === 0) {
+		return { status: "ready", authStatus: "authenticated" };
+	}
 
-  const detail = detailFromResult(result);
-  return {
-    status: "warning",
-    authStatus: "unknown",
-    message: detail
-      ? `Could not verify Codex authentication status. ${detail}`
-      : "Could not verify Codex authentication status.",
-  };
+	const detail = detailFromResult(result);
+	return {
+		status: "warning",
+		authStatus: "unknown",
+		message: detail
+			? `Could not verify Codex authentication status. ${detail}`
+			: "Could not verify Codex authentication status.",
+	};
 }
 
 export interface CopilotStatusClient {
-  readonly start: () => Promise<void>;
-  readonly getStatus: () => Promise<GetStatusResponse>;
-  readonly getAuthStatus: () => Promise<GetAuthStatusResponse>;
-  readonly stop: () => Promise<ReadonlyArray<Error>>;
+	readonly start: () => Promise<void>;
+	readonly getStatus: () => Promise<GetStatusResponse>;
+	readonly getAuthStatus: () => Promise<GetAuthStatusResponse>;
+	readonly stop: () => Promise<ReadonlyArray<Error>>;
 }
 
-export function createCopilotStatusClient(): CopilotStatusClient {
-  return createCopilotClient();
+export async function createCopilotStatusClient(): Promise<CopilotStatusClient> {
+	return createCopilotClient();
 }
 
 // ── Codex CLI config detection ──────────────────────────────────────
@@ -215,37 +241,37 @@ const OPENAI_AUTH_PROVIDERS = new Set(["openai"]);
  * `model_provider`.
  */
 export const readCodexConfigModelProvider = Effect.gen(function* () {
-  const fileSystem = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const codexHome = process.env.CODEX_HOME || path.join(OS.homedir(), ".codex");
-  const configPath = path.join(codexHome, "config.toml");
+	const fileSystem = yield* FileSystem.FileSystem;
+	const path = yield* Path.Path;
+	const codexHome = process.env.CODEX_HOME || path.join(OS.homedir(), ".codex");
+	const configPath = path.join(codexHome, "config.toml");
 
-  const content = yield* fileSystem
-    .readFileString(configPath)
-    .pipe(Effect.orElseSucceed(() => undefined));
-  if (content === undefined) {
-    return undefined;
-  }
+	const content = yield* fileSystem
+		.readFileString(configPath)
+		.pipe(Effect.orElseSucceed(() => undefined));
+	if (content === undefined) {
+		return undefined;
+	}
 
-  // We need to find `model_provider = "..."` at the top level of the
-  // TOML file (i.e. before any `[section]` header). Lines inside
-  // `[profiles.*]`, `[model_providers.*]`, etc. are ignored.
-  let inTopLevel = true;
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    // Skip comments and empty lines.
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    // Detect section headers — once we leave the top level, stop.
-    if (trimmed.startsWith("[")) {
-      inTopLevel = false;
-      continue;
-    }
-    if (!inTopLevel) continue;
+	// We need to find `model_provider = "..."` at the top level of the
+	// TOML file (i.e. before any `[section]` header). Lines inside
+	// `[profiles.*]`, `[model_providers.*]`, etc. are ignored.
+	let inTopLevel = true;
+	for (const line of content.split("\n")) {
+		const trimmed = line.trim();
+		// Skip comments and empty lines.
+		if (!trimmed || trimmed.startsWith("#")) continue;
+		// Detect section headers — once we leave the top level, stop.
+		if (trimmed.startsWith("[")) {
+			inTopLevel = false;
+			continue;
+		}
+		if (!inTopLevel) continue;
 
-    const match = trimmed.match(/^model_provider\s*=\s*["']([^"']+)["']/);
-    if (match) return match[1];
-  }
-  return undefined;
+		const match = trimmed.match(/^model_provider\s*=\s*["']([^"']+)["']/);
+		if (match) return match[1];
+	}
+	return undefined;
 });
 
 /**
@@ -255,248 +281,261 @@ export const readCodexConfigModelProvider = Effect.gen(function* () {
  * environment variables.
  */
 export const hasCustomModelProvider = Effect.map(
-  readCodexConfigModelProvider,
-  (provider) => provider !== undefined && !OPENAI_AUTH_PROVIDERS.has(provider),
+	readCodexConfigModelProvider,
+	(provider) => provider !== undefined && !OPENAI_AUTH_PROVIDERS.has(provider),
 );
 
 // ── Effect-native command execution ─────────────────────────────────
 
-const collectStreamAsString = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.Effect<string, E> =>
-  Stream.runFold(
-    stream,
-    () => "",
-    (acc, chunk) => acc + new TextDecoder().decode(chunk),
-  );
+const collectStreamAsString = <E>(
+	stream: Stream.Stream<Uint8Array, E>,
+): Effect.Effect<string, E> =>
+	Stream.runFold(
+		stream,
+		() => "",
+		(acc, chunk) => acc + new TextDecoder().decode(chunk),
+	);
 
 const runCodexCommand = (args: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const command = ChildProcess.make("codex", [...args], {
-      shell: process.platform === "win32",
-    });
+	Effect.gen(function* () {
+		const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+		const command = ChildProcess.make("codex", [...args], {
+			shell: process.platform === "win32",
+		});
 
-    const child = yield* spawner.spawn(command);
+		const child = yield* spawner.spawn(command);
 
-    const [stdout, stderr, exitCode] = yield* Effect.all(
-      [
-        collectStreamAsString(child.stdout),
-        collectStreamAsString(child.stderr),
-        child.exitCode.pipe(Effect.map(Number)),
-      ],
-      { concurrency: "unbounded" },
-    );
+		const [stdout, stderr, exitCode] = yield* Effect.all(
+			[
+				collectStreamAsString(child.stdout),
+				collectStreamAsString(child.stderr),
+				child.exitCode.pipe(Effect.map(Number)),
+			],
+			{ concurrency: "unbounded" },
+		);
 
-    return { stdout, stderr, code: exitCode } satisfies CommandResult;
-  }).pipe(Effect.scoped);
+		return { stdout, stderr, code: exitCode } satisfies CommandResult;
+	}).pipe(Effect.scoped);
 
 // ── Health check ────────────────────────────────────────────────────
 
 export const checkCodexProviderStatus: Effect.Effect<
-  ServerProviderStatus,
-  never,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
+	ServerProviderStatus,
+	never,
+	ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
 > = Effect.gen(function* () {
-  const checkedAt = new Date().toISOString();
+	const checkedAt = new Date().toISOString();
 
-  // Probe 1: `codex --version` — is the CLI reachable?
-  const versionProbe = yield* runCodexCommand(["--version"]).pipe(
-    Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
-    Effect.result,
-  );
+	// Probe 1: `codex --version` — is the CLI reachable?
+	const versionProbe = yield* runCodexCommand(["--version"]).pipe(
+		Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
+		Effect.result,
+	);
 
-  if (Result.isFailure(versionProbe)) {
-    const error = versionProbe.failure;
-    return {
-      provider: CODEX_PROVIDER,
-      status: "error" as const,
-      available: false,
-      authStatus: "unknown" as const,
-      checkedAt,
-      message: isCommandMissingCause(error)
-        ? "Codex CLI (`codex`) is not installed or not on PATH."
-        : `Failed to execute Codex CLI health check: ${error instanceof Error ? error.message : String(error)}.`,
-    };
-  }
+	if (Result.isFailure(versionProbe)) {
+		const error = versionProbe.failure;
+		return {
+			provider: CODEX_PROVIDER,
+			status: "error" as const,
+			available: false,
+			authStatus: "unknown" as const,
+			checkedAt,
+			message: isCommandMissingCause(error)
+				? "Codex CLI (`codex`) is not installed or not on PATH."
+				: `Failed to execute Codex CLI health check: ${error instanceof Error ? error.message : String(error)}.`,
+		};
+	}
 
-  if (Option.isNone(versionProbe.success)) {
-    return {
-      provider: CODEX_PROVIDER,
-      status: "error" as const,
-      available: false,
-      authStatus: "unknown" as const,
-      checkedAt,
-      message: "Codex CLI is installed but failed to run. Timed out while running command.",
-    };
-  }
+	if (Option.isNone(versionProbe.success)) {
+		return {
+			provider: CODEX_PROVIDER,
+			status: "error" as const,
+			available: false,
+			authStatus: "unknown" as const,
+			checkedAt,
+			message:
+				"Codex CLI is installed but failed to run. Timed out while running command.",
+		};
+	}
 
-  const version = versionProbe.success.value;
-  if (version.code !== 0) {
-    const detail = detailFromResult(version);
-    return {
-      provider: CODEX_PROVIDER,
-      status: "error" as const,
-      available: false,
-      authStatus: "unknown" as const,
-      checkedAt,
-      message: detail
-        ? `Codex CLI is installed but failed to run. ${detail}`
-        : "Codex CLI is installed but failed to run.",
-    };
-  }
+	const version = versionProbe.success.value;
+	if (version.code !== 0) {
+		const detail = detailFromResult(version);
+		return {
+			provider: CODEX_PROVIDER,
+			status: "error" as const,
+			available: false,
+			authStatus: "unknown" as const,
+			checkedAt,
+			message: detail
+				? `Codex CLI is installed but failed to run. ${detail}`
+				: "Codex CLI is installed but failed to run.",
+		};
+	}
 
-  const parsedVersion = parseCodexCliVersion(`${version.stdout}\n${version.stderr}`);
-  if (parsedVersion && !isCodexCliVersionSupported(parsedVersion)) {
-    return {
-      provider: CODEX_PROVIDER,
-      status: "error" as const,
-      available: false,
-      authStatus: "unknown" as const,
-      checkedAt,
-      message: formatCodexCliUpgradeMessage(parsedVersion),
-    };
-  }
+	const parsedVersion = parseCodexCliVersion(
+		`${version.stdout}\n${version.stderr}`,
+	);
+	if (parsedVersion && !isCodexCliVersionSupported(parsedVersion)) {
+		return {
+			provider: CODEX_PROVIDER,
+			status: "error" as const,
+			available: false,
+			authStatus: "unknown" as const,
+			checkedAt,
+			message: formatCodexCliUpgradeMessage(parsedVersion),
+		};
+	}
 
-  // Probe 2: `codex login status` — is the user authenticated?
-  //
-  // Custom model providers (e.g. Portkey, Azure OpenAI proxy) handle
-  // authentication through their own environment variables, so `codex
-  // login status` will report "not logged in" even when the CLI works
-  // fine.  Skip the auth probe entirely for non-OpenAI providers.
-  if (yield* hasCustomModelProvider) {
-    return {
-      provider: CODEX_PROVIDER,
-      status: "ready" as const,
-      available: true,
-      authStatus: "unknown" as const,
-      checkedAt,
-      message: "Using a custom Codex model provider; OpenAI login check skipped.",
-    } satisfies ServerProviderStatus;
-  }
+	// Probe 2: `codex login status` — is the user authenticated?
+	//
+	// Custom model providers (e.g. Portkey, Azure OpenAI proxy) handle
+	// authentication through their own environment variables, so `codex
+	// login status` will report "not logged in" even when the CLI works
+	// fine.  Skip the auth probe entirely for non-OpenAI providers.
+	if (yield* hasCustomModelProvider) {
+		return {
+			provider: CODEX_PROVIDER,
+			status: "ready" as const,
+			available: true,
+			authStatus: "unknown" as const,
+			checkedAt,
+			message:
+				"Using a custom Codex model provider; OpenAI login check skipped.",
+		} satisfies ServerProviderStatus;
+	}
 
-  const authProbe = yield* runCodexCommand(["login", "status"]).pipe(
-    Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
-    Effect.result,
-  );
+	const authProbe = yield* runCodexCommand(["login", "status"]).pipe(
+		Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
+		Effect.result,
+	);
 
-  if (Result.isFailure(authProbe)) {
-    const error = authProbe.failure;
-    return {
-      provider: CODEX_PROVIDER,
-      status: "warning" as const,
-      available: true,
-      authStatus: "unknown" as const,
-      checkedAt,
-      message:
-        error instanceof Error
-          ? `Could not verify Codex authentication status: ${error.message}.`
-          : "Could not verify Codex authentication status.",
-    };
-  }
+	if (Result.isFailure(authProbe)) {
+		const error = authProbe.failure;
+		return {
+			provider: CODEX_PROVIDER,
+			status: "warning" as const,
+			available: true,
+			authStatus: "unknown" as const,
+			checkedAt,
+			message:
+				error instanceof Error
+					? `Could not verify Codex authentication status: ${error.message}.`
+					: "Could not verify Codex authentication status.",
+		};
+	}
 
-  if (Option.isNone(authProbe.success)) {
-    return {
-      provider: CODEX_PROVIDER,
-      status: "warning" as const,
-      available: true,
-      authStatus: "unknown" as const,
-      checkedAt,
-      message: "Could not verify Codex authentication status. Timed out while running command.",
-    };
-  }
+	if (Option.isNone(authProbe.success)) {
+		return {
+			provider: CODEX_PROVIDER,
+			status: "warning" as const,
+			available: true,
+			authStatus: "unknown" as const,
+			checkedAt,
+			message:
+				"Could not verify Codex authentication status. Timed out while running command.",
+		};
+	}
 
-  const parsed = parseAuthStatusFromOutput(authProbe.success.value);
-  return {
-    provider: CODEX_PROVIDER,
-    status: parsed.status,
-    available: true,
-    authStatus: parsed.authStatus,
-    checkedAt,
-    ...(parsed.message ? { message: parsed.message } : {}),
-  } satisfies ServerProviderStatus;
+	const parsed = parseAuthStatusFromOutput(authProbe.success.value);
+	return {
+		provider: CODEX_PROVIDER,
+		status: parsed.status,
+		available: true,
+		authStatus: parsed.authStatus,
+		checkedAt,
+		...(parsed.message ? { message: parsed.message } : {}),
+	} satisfies ServerProviderStatus;
 });
 
 export function checkCopilotProviderStatusWith(
-  createClient: () => CopilotStatusClient = createCopilotStatusClient,
+	createClient: () =>
+		| CopilotStatusClient
+		| Promise<CopilotStatusClient> = createCopilotStatusClient,
 ): Effect.Effect<ServerProviderStatus, never> {
-  return Effect.gen(function* () {
-    const checkedAt = new Date().toISOString();
+	return Effect.gen(function* () {
+		const checkedAt = new Date().toISOString();
 
-    const probe = yield* Effect.tryPromise({
-      try: async () => {
-        const client = createClient();
-        try {
-          await client.start();
-          const [status, authStatus] = await Promise.all([
-            client.getStatus(),
-            client.getAuthStatus(),
-          ]);
-          return { status, authStatus };
-        } finally {
-          await client.stop().catch(() => []);
-        }
-      },
-      catch: (error) =>
-        new CopilotHealthCheckError({
-          message: error instanceof Error ? error.message : String(error),
-          cause: error,
-        }),
-    }).pipe(Effect.timeoutOption(DEFAULT_TIMEOUT_MS), Effect.result);
+		const probe = yield* Effect.tryPromise({
+			try: async () => {
+				const client = await createClient();
+				try {
+					await client.start();
+					const [status, authStatus] = await Promise.all([
+						client.getStatus(),
+						client.getAuthStatus(),
+					]);
+					return { status, authStatus };
+				} finally {
+					await client.stop().catch(() => []);
+				}
+			},
+			catch: (error) =>
+				new CopilotHealthCheckError({
+					message: error instanceof Error ? error.message : String(error),
+					cause: error,
+				}),
+		}).pipe(Effect.timeoutOption(DEFAULT_TIMEOUT_MS), Effect.result);
 
-    if (Result.isFailure(probe)) {
-      const error = probe.failure;
-      const message = error.message;
-      const lower = message.toLowerCase();
+		if (Result.isFailure(probe)) {
+			const error = probe.failure;
+			const message = error.message;
+			const lower = message.toLowerCase();
 
-      return {
-        provider: COPILOT_PROVIDER,
-        status: "error" as const,
-        available: false,
-        authStatus: "unknown" as const,
-        checkedAt,
-        message:
-          lower.includes("node.js v24") || lower.includes("requires node.js")
-            ? `GitHub Copilot CLI is unavailable. ${message}`
-            : lower.includes("enoent") || lower.includes("not found")
-              ? "GitHub Copilot CLI is not installed or not available."
-              : `Failed to execute GitHub Copilot health check: ${message}.`,
-      } satisfies ServerProviderStatus;
-    }
+			return {
+				provider: COPILOT_PROVIDER,
+				status: "error" as const,
+				available: false,
+				authStatus: "unknown" as const,
+				checkedAt,
+				message:
+					lower.includes("node.js v24") || lower.includes("requires node.js")
+						? `GitHub Copilot CLI is unavailable. ${message}`
+						: lower.includes("cannot find module") ||
+							  lower.includes("err_module_not_found") ||
+							  lower.includes("failed to load github copilot sdk")
+							? `GitHub Copilot SDK is unavailable in the current runtime. ${message}`
+							: lower.includes("enoent") || lower.includes("not found")
+								? "GitHub Copilot CLI is not installed or not available."
+								: `Failed to execute GitHub Copilot health check: ${message}.`,
+			} satisfies ServerProviderStatus;
+		}
 
-    if (Option.isNone(probe.success)) {
-      return {
-        provider: COPILOT_PROVIDER,
-        status: "warning" as const,
-        available: true,
-        authStatus: "unknown" as const,
-        checkedAt,
-        message:
-          "Could not verify GitHub Copilot authentication status. Timed out while running command.",
-      } satisfies ServerProviderStatus;
-    }
+		if (Option.isNone(probe.success)) {
+			return {
+				provider: COPILOT_PROVIDER,
+				status: "warning" as const,
+				available: true,
+				authStatus: "unknown" as const,
+				checkedAt,
+				message:
+					"Could not verify GitHub Copilot authentication status. Timed out while running command.",
+			} satisfies ServerProviderStatus;
+		}
 
-    const { authStatus } = probe.success.value;
-    if (authStatus.isAuthenticated) {
-      return {
-        provider: COPILOT_PROVIDER,
-        status: "ready" as const,
-        available: true,
-        authStatus: "authenticated" as const,
-        checkedAt,
-      } satisfies ServerProviderStatus;
-    }
+		const { authStatus } = probe.success.value;
+		if (authStatus.isAuthenticated) {
+			return {
+				provider: COPILOT_PROVIDER,
+				status: "ready" as const,
+				available: true,
+				authStatus: "authenticated" as const,
+				checkedAt,
+			} satisfies ServerProviderStatus;
+		}
 
-    const detail = nonEmptyTrimmed(authStatus.statusMessage);
-    return {
-      provider: COPILOT_PROVIDER,
-      status: "error" as const,
-      available: true,
-      authStatus: "unauthenticated" as const,
-      checkedAt,
-      message: detail
-        ? `GitHub Copilot is not authenticated. ${detail}`
-        : "GitHub Copilot is not authenticated. Sign in with the GitHub Copilot CLI and try again.",
-    } satisfies ServerProviderStatus;
-  });
+		const detail = nonEmptyTrimmed(authStatus.statusMessage);
+		return {
+			provider: COPILOT_PROVIDER,
+			status: "error" as const,
+			available: true,
+			authStatus: "unauthenticated" as const,
+			checkedAt,
+			message: detail
+				? `GitHub Copilot is not authenticated. ${detail}`
+				: "GitHub Copilot is not authenticated. Sign in with the GitHub Copilot CLI and try again.",
+		} satisfies ServerProviderStatus;
+	});
 }
 
 export const checkCopilotProviderStatus = checkCopilotProviderStatusWith();
@@ -504,13 +543,20 @@ export const checkCopilotProviderStatus = checkCopilotProviderStatusWith();
 // ── Layer ───────────────────────────────────────────────────────────
 
 export const ProviderHealthLive = Layer.effect(
-  ProviderHealth,
-  Effect.gen(function* () {
-    const codexStatusFiber = yield* checkCodexProviderStatus.pipe(Effect.forkScoped);
-    const copilotStatusFiber = yield* checkCopilotProviderStatus.pipe(Effect.forkScoped);
+	ProviderHealth,
+	Effect.gen(function* () {
+		const codexStatusFiber = yield* checkCodexProviderStatus.pipe(
+			Effect.forkScoped,
+		);
+		const copilotStatusFiber = yield* checkCopilotProviderStatus.pipe(
+			Effect.forkScoped,
+		);
 
-    return {
-      getStatuses: Effect.all([Fiber.join(codexStatusFiber), Fiber.join(copilotStatusFiber)]),
-    } satisfies ProviderHealthShape;
-  }),
+		return {
+			getStatuses: Effect.all([
+				Fiber.join(codexStatusFiber),
+				Fiber.join(copilotStatusFiber),
+			]),
+		} satisfies ProviderHealthShape;
+	}),
 );
