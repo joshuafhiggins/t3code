@@ -30,6 +30,7 @@ import {
   ProviderAdapterSessionNotFoundError,
   type ProviderAdapterError,
 } from "../Errors.ts";
+import { createCopilotClient } from "../copilotClient.ts";
 import { CopilotAdapter, type CopilotAdapterShape } from "../Services/CopilotAdapter.ts";
 import type { ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
@@ -606,12 +607,10 @@ const makeCopilotAdapter = (_options?: CopilotAdapterLiveOptions) =>
 
     const makeClient = (input: ProviderSessionStartInput): CopilotClient => {
       const copilotOptions = input.providerOptions?.copilot;
-      return new CopilotClient({
+      return createCopilotClient({
         ...(input.cwd ? { cwd: input.cwd } : {}),
         ...(copilotOptions?.cliPath ? { cliPath: copilotOptions.cliPath } : {}),
-        ...(copilotOptions?.githubToken
-          ? { githubToken: copilotOptions.githubToken, useLoggedInUser: false }
-          : {}),
+        ...(copilotOptions?.githubToken ? { githubToken: copilotOptions.githubToken } : {}),
       });
     };
 

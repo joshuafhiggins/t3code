@@ -52,6 +52,13 @@ import {
   deriveActiveWorkStartedAt,
   deriveActivePlanState,
   findLatestProposedPlan,
+  getProviderForNewSession,
+  getPreferredAuthenticatedProvider,
+  getProviderPreflightError,
+  type PendingApproval,
+  type PendingUserInput,
+  type ProviderPickerKind,
+  PROVIDER_OPTIONS,
   deriveWorkLogEntries,
   hasToolActivityForTurn,
   isLatestTurnSettled,
@@ -169,6 +176,51 @@ const EMPTY_PENDING_USER_INPUT_ANSWERS: Record<string, PendingUserInputDraftAnsw
 const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
+
+function getModelOptionsForDispatch(input: {
+  provider: ProviderKind;
+  supportsReasoningEffort: boolean;
+  selectedEffort: CodexReasoningEffort | null;
+  selectedCodexFastModeEnabled: boolean;
+}) {
+  const sharedOptions =
+    input.supportsReasoningEffort && input.selectedEffort
+      ? { reasoningEffort: input.selectedEffort }
+      : {};
+
+  if (input.provider === "copilot") {
+    return Object.keys(sharedOptions).length > 0 ? { copilot: sharedOptions } : undefined;
+  }
+  if (input.provider !== "codex") {
+    return undefined;
+  }
+
+  const codexOptions = {
+    ...sharedOptions,
+    ...(input.selectedCodexFastModeEnabled ? { fastMode: true } : {}),
+  };
+  return Object.keys(codexOptions).length > 0 ? { codex: codexOptions } : undefined;
+}
+
+function getProviderOptionsForDispatch(input: {
+  provider: ProviderKind;
+  codexBinaryPath: string;
+  codexHomePath: string;
+}) {
+  if (input.provider !== "codex") {
+    return undefined;
+  }
+  if (!input.codexBinaryPath && !input.codexHomePath) {
+    return undefined;
+  }
+  return {
+    codex: {
+      ...(input.codexBinaryPath ? { binaryPath: input.codexBinaryPath } : {}),
+      ...(input.codexHomePath ? { homePath: input.codexHomePath } : {}),
+    },
+  };
+}
+
 
 interface ChatViewProps {
   threadId: ThreadId;
@@ -497,32 +549,25 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const selectedEffort = composerDraft.effort ?? getDefaultReasoningEffort(selectedProvider);
   const selectedCodexFastModeEnabled =
     selectedProvider === "codex" ? composerDraft.codexFastMode : false;
-  const selectedModelOptionsForDispatch = useMemo(() => {
-    const sharedOptions =
-      supportsReasoningEffort && selectedEffort ? { reasoningEffort: selectedEffort } : {};
-    if (selectedProvider === "copilot") {
-      return Object.keys(sharedOptions).length > 0 ? { copilot: sharedOptions } : undefined;
-    }
-    if (selectedProvider !== "codex") {
-      return undefined;
-    }
-    const codexOptions = {
-      ...sharedOptions,
-      ...(selectedCodexFastModeEnabled ? { fastMode: true } : {}),
-    };
-    return Object.keys(codexOptions).length > 0 ? { codex: codexOptions } : undefined;
-  }, [selectedCodexFastModeEnabled, selectedEffort, selectedProvider, supportsReasoningEffort]);
-  const providerOptionsForDispatch = useMemo(() => {
-    if (!settings.codexBinaryPath && !settings.codexHomePath) {
-      return undefined;
-    }
-    return {
-      codex: {
-        ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
-        ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
-      },
-    };
-  }, [settings.codexBinaryPath, settings.codexHomePath]);
+  const selectedModelOptionsForDispatch = useMemo(
+    () =>
+      getModelOptionsForDispatch({
+        provider: selectedProvider,
+        supportsReasoningEffort,
+        selectedEffort,
+        selectedCodexFastModeEnabled,
+      }),
+    [selectedCodexFastModeEnabled, selectedEffort, selectedProvider, supportsReasoningEffort],
+  );
+  const providerOptionsForDispatch = useMemo(
+    () =>
+      getProviderOptionsForDispatch({
+        provider: selectedProvider,
+        codexBinaryPath: settings.codexBinaryPath,
+        codexHomePath: settings.codexHomePath,
+      }),
+    [selectedProvider, settings.codexBinaryPath, settings.codexHomePath],
+  );
   const selectedModelForPicker = selectedModel;
   const modelOptionsByProvider = useMemo(
     () => getCustomModelOptionsByProvider(settings),
@@ -875,6 +920,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const effectivePathQuery = pathTriggerQuery.length > 0 ? debouncedPathQuery : "";
   const branchesQuery = useQuery(gitBranchesQueryOptions(gitCwd));
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
+  const providerStatuses = serverConfigQuery.data?.providers ?? EMPTY_PROVIDER_STATUSES;
   const workspaceEntriesQuery = useQuery(
     projectSearchEntriesQueryOptions({
       cwd: gitCwd,
@@ -964,13 +1010,80 @@ export default function ChatView({ threadId }: ChatViewProps) {
   );
   const keybindings = serverConfigQuery.data?.keybindings ?? EMPTY_KEYBINDINGS;
   const availableEditors = serverConfigQuery.data?.availableEditors ?? EMPTY_AVAILABLE_EDITORS;
-  const providerStatuses = serverConfigQuery.data?.providers ?? EMPTY_PROVIDER_STATUSES;
-  const activeProvider = activeThread?.session?.provider ?? "codex";
+  const activeProjectCwd = activeProject?.cwd ?? null;
+  const selectedProviderStatus = useMemo(
+    () => providerStatuses.find((status) => status.provider === selectedProvider) ?? null,
+    [providerStatuses, selectedProvider],
+  );
+  const activeProvider = activeThread?.session?.provider ?? selectedProvider;
   const activeProviderStatus = useMemo(
     () => providerStatuses.find((status) => status.provider === activeProvider) ?? null,
     [activeProvider, providerStatuses],
   );
-  const activeProjectCwd = activeProject?.cwd ?? null;
+  const visibleProviderStatus = hasThreadStarted ? activeProviderStatus : selectedProviderStatus;
+  useEffect(() => {
+    if (
+      lockedProvider !== null ||
+      composerDraft.provider !== null ||
+      providerStatuses.length === 0
+    ) {
+      return;
+    }
+
+    const preferredProvider = getPreferredAuthenticatedProvider(providerStatuses);
+    if (preferredProvider !== "codex") {
+      setComposerDraftProvider(threadId, preferredProvider);
+    }
+  }, [
+    composerDraft.provider,
+    lockedProvider,
+    providerStatuses,
+    setComposerDraftProvider,
+    threadId,
+  ]);
+  const getSelectedProviderSendError = useCallback(
+    () => getProviderPreflightError(selectedProviderStatus),
+    [selectedProviderStatus],
+  );
+  const providerForNewSession = useMemo(
+    () => getProviderForNewSession(selectedProvider, providerStatuses),
+    [providerStatuses, selectedProvider],
+  );
+  const modelForNewSession = useMemo(() => {
+    const customModelsForProvider =
+      providerForNewSession === "copilot"
+        ? settings.customCopilotModels
+        : settings.customCodexModels;
+    return resolveAppModelSelection(
+      providerForNewSession,
+      customModelsForProvider,
+      selectedModel,
+    ) as ModelSlug;
+  }, [
+    providerForNewSession,
+    selectedModel,
+    settings.customCodexModels,
+    settings.customCopilotModels,
+  ]);
+  const modelOptionsForNewSession = useMemo(
+    () =>
+      getModelOptionsForDispatch({
+        provider: providerForNewSession,
+        supportsReasoningEffort,
+        selectedEffort,
+        selectedCodexFastModeEnabled,
+      }),
+    [providerForNewSession, selectedCodexFastModeEnabled, selectedEffort, supportsReasoningEffort],
+  );
+  const providerOptionsForNewSession = useMemo(
+    () =>
+      getProviderOptionsForDispatch({
+        provider: providerForNewSession,
+        codexBinaryPath: settings.codexBinaryPath,
+        codexHomePath: settings.codexHomePath,
+      }),
+    [providerForNewSession, settings.codexBinaryPath, settings.codexHomePath],
+  );
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const threadTerminalRuntimeEnv = useMemo(() => {
     if (!activeProjectCwd) return {};
@@ -2206,6 +2319,11 @@ export default function ChatView({ threadId }: ChatViewProps) {
     if (!trimmed && composerImages.length === 0) return;
     if (!activeProject) return;
     const threadIdForSend = activeThread.id;
+    const providerSendError = getSelectedProviderSendError();
+    if (providerSendError) {
+      setThreadError(threadIdForSend, providerSendError);
+      return;
+    }
     const isFirstMessage = !isServerThread || activeThread.messages.length === 0;
     const baseBranchForWorktree =
       isFirstMessage && envMode === "worktree" && !activeThread.worktreePath
@@ -2315,8 +2433,9 @@ export default function ChatView({ threadId }: ChatViewProps) {
         }
       }
       const title = truncateTitle(titleSeed);
-      let threadCreateModel: ModelSlug =
-        selectedModel || (activeProject.model as ModelSlug) || DEFAULT_MODEL_BY_PROVIDER.codex;
+      let threadCreateModel: ModelSlug = isLocalDraftThread
+        ? modelForNewSession
+        : selectedModel || (activeProject.model as ModelSlug) || DEFAULT_MODEL_BY_PROVIDER.codex;
 
       if (isLocalDraftThread) {
         await api.orchestration.dispatchCommand({
@@ -2393,12 +2512,24 @@ export default function ChatView({ threadId }: ChatViewProps) {
           text: trimmed || IMAGE_ONLY_BOOTSTRAP_PROMPT,
           attachments: turnAttachments,
         },
-        model: selectedModel || undefined,
-        ...(selectedModelOptionsForDispatch
-          ? { modelOptions: selectedModelOptionsForDispatch }
+        model: isLocalDraftThread ? modelForNewSession : selectedModel || undefined,
+        ...(isLocalDraftThread
+          ? modelOptionsForNewSession
+          : selectedModelOptionsForDispatch
+            ? {
+                modelOptions: isLocalDraftThread
+                  ? modelOptionsForNewSession
+                  : selectedModelOptionsForDispatch,
+              }
+            : {}),
+        ...((isLocalDraftThread ? providerOptionsForNewSession : providerOptionsForDispatch)
+          ? {
+              providerOptions: isLocalDraftThread
+                ? providerOptionsForNewSession
+                : providerOptionsForDispatch,
+            }
           : {}),
-        ...(providerOptionsForDispatch ? { providerOptions: providerOptionsForDispatch } : {}),
-        provider: selectedProvider,
+        provider: isLocalDraftThread ? providerForNewSession : selectedProvider,
         assistantDeliveryMode: settings.enableAssistantStreaming ? "streaming" : "buffered",
         runtimeMode,
         interactionMode,
@@ -2625,6 +2756,11 @@ export default function ChatView({ threadId }: ChatViewProps) {
       }
 
       const threadIdForSend = activeThread.id;
+      const providerSendError = getSelectedProviderSendError();
+      if (providerSendError) {
+        setThreadError(threadIdForSend, providerSendError);
+        return;
+      }
       const messageIdForSend = newMessageId();
       const messageCreatedAt = new Date().toISOString();
 
@@ -2702,6 +2838,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       activeThread,
       beginSendPhase,
       forceStickToBottom,
+      getSelectedProviderSendError,
       isConnecting,
       isSendBusy,
       isServerThread,
@@ -2738,11 +2875,6 @@ export default function ChatView({ threadId }: ChatViewProps) {
     const planMarkdown = activeProposedPlan.planMarkdown;
     const implementationPrompt = buildPlanImplementationPrompt(planMarkdown);
     const nextThreadTitle = truncateTitle(buildPlanImplementationThreadTitle(planMarkdown));
-    const nextThreadModel: ModelSlug =
-      selectedModel ||
-      (activeThread.model as ModelSlug) ||
-      (activeProject.model as ModelSlug) ||
-      DEFAULT_MODEL_BY_PROVIDER.codex;
 
     sendInFlightRef.current = true;
     beginSendPhase("sending-turn");
@@ -2758,7 +2890,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
         threadId: nextThreadId,
         projectId: activeProject.id,
         title: nextThreadTitle,
-        model: nextThreadModel,
+        model: modelForNewSession,
         runtimeMode,
         interactionMode: "default",
         branch: activeThread.branch,
@@ -2776,12 +2908,12 @@ export default function ChatView({ threadId }: ChatViewProps) {
             text: implementationPrompt,
             attachments: [],
           },
-          provider: selectedProvider,
-          model: selectedModel || undefined,
-          ...(selectedModelOptionsForDispatch
-            ? { modelOptions: selectedModelOptionsForDispatch }
+          provider: providerForNewSession,
+          model: modelForNewSession,
+          ...(modelOptionsForNewSession ? { modelOptions: modelOptionsForNewSession } : {}),
+          ...(providerOptionsForNewSession
+            ? { providerOptions: providerOptionsForNewSession }
             : {}),
-          ...(providerOptionsForDispatch ? { providerOptions: providerOptionsForDispatch } : {}),
           assistantDeliveryMode: settings.enableAssistantStreaming ? "streaming" : "buffered",
           runtimeMode,
           interactionMode: "default",
@@ -2828,13 +2960,13 @@ export default function ChatView({ threadId }: ChatViewProps) {
     isConnecting,
     isSendBusy,
     isServerThread,
+    modelForNewSession,
+    modelOptionsForNewSession,
     navigate,
+    providerForNewSession,
+    providerOptionsForNewSession,
     resetSendPhase,
     runtimeMode,
-    selectedModel,
-    selectedModelOptionsForDispatch,
-    providerOptionsForDispatch,
-    selectedProvider,
     settings.enableAssistantStreaming,
     syncServerReadModel,
   ]);
@@ -3202,7 +3334,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       </header>
 
       {/* Error banner */}
-      <ProviderHealthBanner status={activeProviderStatus} />
+      <ProviderHealthBanner status={visibleProviderStatus} />
       <ThreadErrorBanner
         error={activeThread.error}
         onDismiss={() => setThreadError(activeThread.id, null)}

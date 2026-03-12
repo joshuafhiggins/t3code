@@ -72,6 +72,13 @@ const defaultProviderStatuses: ReadonlyArray<ServerProviderStatus> = [
     authStatus: "authenticated",
     checkedAt: "2026-01-01T00:00:00.000Z",
   },
+  {
+    provider: "copilot",
+    status: "ready",
+    available: true,
+    authStatus: "authenticated",
+    checkedAt: "2026-01-01T00:00:00.000Z",
+  },
 ];
 
 const defaultProviderHealthService: ProviderHealthShape = {
@@ -638,7 +645,11 @@ describe("WebSocket Server", () => {
     const staticDir = makeTempDir("t3code-static-root-");
     fs.writeFileSync(path.join(staticDir, "index.html"), "<h1>static-root</h1>", "utf8");
 
-    server = await createTestServer({ cwd: "/test/project", stateDir, staticDir });
+    server = await createTestServer({
+      cwd: "/test/project",
+      stateDir,
+      staticDir,
+    });
     const addr = server.address();
     const port = typeof addr === "object" && addr !== null ? addr.port : 0;
     expect(port).toBeGreaterThan(0);
@@ -653,7 +664,11 @@ describe("WebSocket Server", () => {
     const staticDir = makeTempDir("t3code-static-traversal-");
     fs.writeFileSync(path.join(staticDir, "index.html"), "<h1>safe</h1>", "utf8");
 
-    server = await createTestServer({ cwd: "/test/project", stateDir, staticDir });
+    server = await createTestServer({
+      cwd: "/test/project",
+      stateDir,
+      staticDir,
+    });
     const addr = server.address();
     const port = typeof addr === "object" && addr !== null ? addr.port : 0;
     expect(port).toBeGreaterThan(0);
@@ -979,7 +994,10 @@ describe("WebSocket Server", () => {
       "[]",
       (push) => Array.isArray(push.data.issues) && push.data.issues.length === 0,
     );
-    expect(successPush.data).toEqual({ issues: [], providers: defaultProviderStatuses });
+    expect(successPush.data).toEqual({
+      issues: [],
+      providers: defaultProviderStatuses,
+    });
   });
 
   it("routes shell.openInEditor through the injected open service", async () => {
@@ -992,7 +1010,10 @@ describe("WebSocket Server", () => {
       },
     };
 
-    server = await createTestServer({ cwd: "/my/workspace", open: openService });
+    server = await createTestServer({
+      cwd: "/my/workspace",
+      open: openService,
+    });
     const addr = server.address();
     const port = typeof addr === "object" && addr !== null ? addr.port : 0;
 
@@ -1306,7 +1327,10 @@ describe("WebSocket Server", () => {
     } as unknown as ProviderRuntimeEvent);
 
     const domainPush = await waitForPush(ws, ORCHESTRATION_WS_CHANNELS.domainEvent, (push) => {
-      const event = push.data as { type?: string; payload?: { messageId?: string; text?: string } };
+      const event = push.data as {
+        type?: string;
+        payload?: { messageId?: string; text?: string };
+      };
       return (
         event.type === "thread.message-sent" && event.payload?.messageId === "assistant:item-1"
       );
@@ -1470,7 +1494,10 @@ describe("WebSocket Server", () => {
     };
 
     try {
-      server = await createTestServer({ cwd: "/test", open: brokenOpenService });
+      server = await createTestServer({
+        cwd: "/test",
+        open: brokenOpenService,
+      });
       const addr = server.address();
       const port = typeof addr === "object" && addr !== null ? addr.port : 0;
 
@@ -1541,7 +1568,9 @@ describe("WebSocket Server", () => {
 
   it("supports projects.searchEntries", async () => {
     const workspace = makeTempDir("t3code-ws-workspace-entries-");
-    fs.mkdirSync(path.join(workspace, "src", "components"), { recursive: true });
+    fs.mkdirSync(path.join(workspace, "src", "components"), {
+      recursive: true,
+    });
     fs.writeFileSync(
       path.join(workspace, "src", "components", "Composer.tsx"),
       "export {};",
@@ -1567,7 +1596,10 @@ describe("WebSocket Server", () => {
     expect(response.result).toEqual({
       entries: expect.arrayContaining([
         expect.objectContaining({ path: "src/components", kind: "directory" }),
-        expect.objectContaining({ path: "src/components/Composer.tsx", kind: "file" }),
+        expect.objectContaining({
+          path: "src/components/Composer.tsx",
+          kind: "file",
+        }),
       ]),
       truncated: false,
     });
@@ -1655,16 +1687,26 @@ describe("WebSocket Server", () => {
     const [ws] = await connectAndAwaitWelcome(port);
     connections.push(ws);
 
-    const listResponse = await sendRequest(ws, WS_METHODS.gitListBranches, { cwd: "/repo/path" });
+    const listResponse = await sendRequest(ws, WS_METHODS.gitListBranches, {
+      cwd: "/repo/path",
+    });
     expect(listResponse.error).toBeUndefined();
-    expect(listResponse.result).toEqual({ branches: [], isRepo: false, hasOriginRemote: false });
+    expect(listResponse.result).toEqual({
+      branches: [],
+      isRepo: false,
+      hasOriginRemote: false,
+    });
     expect(listBranches).toHaveBeenCalledWith({ cwd: "/repo/path" });
 
-    const initResponse = await sendRequest(ws, WS_METHODS.gitInit, { cwd: "/repo/path" });
+    const initResponse = await sendRequest(ws, WS_METHODS.gitInit, {
+      cwd: "/repo/path",
+    });
     expect(initResponse.error).toBeUndefined();
     expect(initRepo).toHaveBeenCalledWith({ cwd: "/repo/path" });
 
-    const pullResponse = await sendRequest(ws, WS_METHODS.gitPull, { cwd: "/repo/path" });
+    const pullResponse = await sendRequest(ws, WS_METHODS.gitPull, {
+      cwd: "/repo/path",
+    });
     expect(pullResponse.result).toBeUndefined();
     expect(pullResponse.error?.message).toContain("No upstream configured");
     expect(pullCurrentBranch).toHaveBeenCalledWith("/repo/path");
@@ -1803,7 +1845,10 @@ describe("WebSocket Server", () => {
   });
 
   it("rejects websocket connections without a valid auth token", async () => {
-    server = await createTestServer({ cwd: "/test", authToken: "secret-token" });
+    server = await createTestServer({
+      cwd: "/test",
+      authToken: "secret-token",
+    });
     const addr = server.address();
     const port = typeof addr === "object" && addr !== null ? addr.port : 0;
 

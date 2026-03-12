@@ -3,8 +3,10 @@ import { describe, it, assert } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Path, Sink, Stream } from "effect";
 import * as PlatformError from "effect/PlatformError";
 import { ChildProcessSpawner } from "effect/unstable/process";
+import { vi } from "vitest";
 
 import {
+  checkCopilotProviderStatusWith,
   checkCodexProviderStatus,
   hasCustomModelProvider,
   parseAuthStatusFromOutput,
@@ -31,7 +33,11 @@ function mockHandle(result: { stdout: string; stderr: string; code: number }) {
 }
 
 function mockSpawnerLayer(
-  handler: (args: ReadonlyArray<string>) => { stdout: string; stderr: string; code: number },
+  handler: (args: ReadonlyArray<string>) => {
+    stdout: string;
+    stderr: string;
+    code: number;
+  },
 ) {
   return Layer.succeed(
     ChildProcessSpawner.ChildProcessSpawner,
@@ -66,7 +72,9 @@ function withTempCodexHome(configContent?: string) {
   return Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const tmpDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-test-codex-" });
+    const tmpDir = yield* fileSystem.makeTempDirectoryScoped({
+      prefix: "t3-test-codex-",
+    });
 
     yield* Effect.acquireRelease(
       Effect.sync(() => {
@@ -175,7 +183,11 @@ it.layer(NodeServices.layer)("ProviderHealth", (it) => {
             const joined = args.join(" ");
             if (joined === "--version") return { stdout: "codex 1.0.0\n", stderr: "", code: 0 };
             if (joined === "login status") {
-              return { stdout: "", stderr: "Not logged in. Run codex login.", code: 1 };
+              return {
+                stdout: "",
+                stderr: "Not logged in. Run codex login.",
+                code: 1,
+              };
             }
             throw new Error(`Unexpected args: ${joined}`);
           }),
@@ -226,7 +238,11 @@ it.layer(NodeServices.layer)("ProviderHealth", (it) => {
             const joined = args.join(" ");
             if (joined === "--version") return { stdout: "codex 1.0.0\n", stderr: "", code: 0 };
             if (joined === "login status") {
-              return { stdout: "", stderr: "error: unknown command 'login'", code: 2 };
+              return {
+                stdout: "",
+                stderr: "error: unknown command 'login'",
+                code: 2,
+              };
             }
             throw new Error(`Unexpected args: ${joined}`);
           }),
@@ -315,7 +331,11 @@ it.layer(NodeServices.layer)("ProviderHealth", (it) => {
 
   describe("parseAuthStatusFromOutput", () => {
     it("exit code 0 with no auth markers is ready", () => {
-      const parsed = parseAuthStatusFromOutput({ stdout: "OK\n", stderr: "", code: 0 });
+      const parsed = parseAuthStatusFromOutput({
+        stdout: "OK\n",
+        stderr: "",
+        code: 0,
+      });
       assert.strictEqual(parsed.status, "ready");
       assert.strictEqual(parsed.authStatus, "authenticated");
     });
@@ -339,6 +359,93 @@ it.layer(NodeServices.layer)("ProviderHealth", (it) => {
       assert.strictEqual(parsed.status, "warning");
       assert.strictEqual(parsed.authStatus, "unknown");
     });
+  });
+
+  describe("checkCopilotProviderStatusWith", () => {
+    it.effect("returns ready when copilot is installed and authenticated", () =>
+      Effect.gen(function* () {
+        const start = vi.fn(async () => undefined);
+        const stop = vi.fn(async () => []);
+        const status = yield* checkCopilotProviderStatusWith(() => ({
+          start,
+          getStatus: async () => ({ version: "1.0.0", protocolVersion: 1 }),
+          getAuthStatus: async () => ({
+            isAuthenticated: true,
+            statusMessage: "Authenticated as octocat",
+          }),
+          stop,
+        }));
+
+        assert.strictEqual(status.provider, "copilot");
+        assert.strictEqual(status.status, "ready");
+        assert.strictEqual(status.available, true);
+        assert.strictEqual(status.authStatus, "authenticated");
+        assert.strictEqual(start.mock.calls.length, 1);
+        assert.strictEqual(stop.mock.calls.length, 1);
+      }),
+    );
+
+    it.effect("returns unauthenticated when copilot auth probe reports logged out", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCopilotProviderStatusWith(() => ({
+          start: async () => undefined,
+          getStatus: async () => ({ version: "1.0.0", protocolVersion: 1 }),
+          getAuthStatus: async () => ({
+            isAuthenticated: false,
+            statusMessage: "Run `copilot auth login` to authenticate.",
+          }),
+          stop: async () => [],
+        }));
+
+        assert.strictEqual(status.provider, "copilot");
+        assert.strictEqual(status.status, "error");
+        assert.strictEqual(status.available, true);
+        assert.strictEqual(status.authStatus, "unauthenticated");
+        assert.strictEqual(
+          status.message,
+          "GitHub Copilot is not authenticated. Run `copilot auth login` to authenticate.",
+        );
+      }),
+    );
+
+    it.effect("returns unavailable when the copilot cli is missing", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCopilotProviderStatusWith(() => {
+          throw new Error("spawn copilot ENOENT");
+        });
+
+        assert.strictEqual(status.provider, "copilot");
+        assert.strictEqual(status.status, "error");
+        assert.strictEqual(status.available, false);
+        assert.strictEqual(status.authStatus, "unknown");
+        assert.strictEqual(status.message, "GitHub Copilot CLI is not installed or not available.");
+      }),
+    );
+
+    it.effect("returns unavailable when the client cannot start", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCopilotProviderStatusWith(() => ({
+          start: async () => {
+            throw new Error("Client not connected. Call start() first.");
+          },
+          getStatus: async () => ({ version: "1.0.0", protocolVersion: 1 }),
+          getAuthStatus: async () => ({
+            isAuthenticated: true,
+            statusMessage: "Authenticated as octocat",
+          }),
+          stop: async () => [],
+        }));
+
+        assert.strictEqual(status.provider, "copilot");
+        assert.strictEqual(status.status, "error");
+        assert.strictEqual(status.available, false);
+        assert.strictEqual(status.authStatus, "unknown");
+        assert.strictEqual(
+          status.message,
+          "Failed to execute GitHub Copilot health check: Client not connected. Call start() first..",
+        );
+      }),
+    );
   });
 
   // ── readCodexConfigModelProvider tests ─────────────────────────────
