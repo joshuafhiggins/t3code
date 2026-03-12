@@ -4,6 +4,7 @@ import {
   type OrchestrationThreadActivity,
   type OrchestrationProposedPlanId,
   type ProviderKind,
+  type ServerProviderStatus,
   type UserInputQuestion,
   type TurnId,
 } from "@t3tools/contracts";
@@ -28,6 +29,51 @@ export const PROVIDER_OPTIONS: Array<{
   { value: "claudeCode", label: "Claude Code", available: false },
   { value: "cursor", label: "Cursor", available: false },
 ];
+
+export function getPreferredAuthenticatedProvider(
+  statuses: ReadonlyArray<ServerProviderStatus>,
+  fallback: ProviderKind = "codex",
+): ProviderKind {
+  for (const option of PROVIDER_OPTIONS) {
+    if (option.value !== "codex" && option.value !== "copilot") {
+      continue;
+    }
+    const status = statuses.find((candidate) => candidate.provider === option.value);
+    if (status?.available && status.authStatus === "authenticated") {
+      return option.value;
+    }
+  }
+
+  return fallback;
+}
+
+export function getProviderForNewSession(
+  currentProvider: ProviderKind,
+  statuses: ReadonlyArray<ServerProviderStatus>,
+): ProviderKind {
+  const currentStatus = statuses.find((status) => status.provider === currentProvider);
+  if (currentStatus?.available && currentStatus.authStatus === "authenticated") {
+    return currentProvider;
+  }
+
+  return getPreferredAuthenticatedProvider(statuses, currentProvider);
+}
+
+export function getProviderPreflightError(status: ServerProviderStatus | null): string | null {
+  if (!status) {
+    return null;
+  }
+  if (!status.available) {
+    return status.message ?? `${status.provider} provider is unavailable.`;
+  }
+  if (status.authStatus === "unauthenticated") {
+    return status.message ?? `${status.provider} provider is not authenticated.`;
+  }
+  if (status.status === "error") {
+    return status.message ?? `${status.provider} provider is unavailable.`;
+  }
+  return null;
+}
 
 export interface WorkLogEntry {
   id: string;

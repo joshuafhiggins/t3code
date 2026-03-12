@@ -1,9 +1,18 @@
-import { EventId, MessageId, TurnId, type OrchestrationThreadActivity } from "@t3tools/contracts";
+import {
+  EventId,
+  MessageId,
+  TurnId,
+  type OrchestrationThreadActivity,
+  type ServerProviderStatus,
+} from "@t3tools/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
   deriveActiveWorkStartedAt,
   deriveActivePlanState,
+  getPreferredAuthenticatedProvider,
+  getProviderForNewSession,
+  getProviderPreflightError,
   PROVIDER_OPTIONS,
   derivePendingApprovals,
   derivePendingUserInputs,
@@ -13,6 +22,18 @@ import {
   hasToolActivityForTurn,
   isLatestTurnSettled,
 } from "./session-logic";
+
+function makeProviderStatus(
+  overrides: Partial<ServerProviderStatus> & Pick<ServerProviderStatus, "provider">,
+): ServerProviderStatus {
+  return {
+    status: "ready",
+    available: true,
+    authStatus: "authenticated",
+    checkedAt: "2026-03-11T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 function makeActivity(overrides: {
   id?: string;
@@ -726,5 +747,98 @@ describe("PROVIDER_OPTIONS", () => {
       label: "Cursor",
       available: false,
     });
+  });
+});
+
+describe("getPreferredAuthenticatedProvider", () => {
+  it("defaults to copilot when codex is unauthenticated and copilot is authenticated", () => {
+    expect(
+      getPreferredAuthenticatedProvider([
+        makeProviderStatus({
+          provider: "codex",
+          authStatus: "unauthenticated",
+          status: "error",
+        }),
+        makeProviderStatus({ provider: "copilot" }),
+      ]),
+    ).toBe("copilot");
+  });
+
+  it("prefers codex when both providers are authenticated", () => {
+    expect(
+      getPreferredAuthenticatedProvider([
+        makeProviderStatus({ provider: "codex" }),
+        makeProviderStatus({ provider: "copilot" }),
+      ]),
+    ).toBe("codex");
+  });
+});
+
+describe("getProviderForNewSession", () => {
+  it("keeps the current provider when it is already authenticated", () => {
+    expect(
+      getProviderForNewSession("copilot", [
+        makeProviderStatus({ provider: "codex" }),
+        makeProviderStatus({ provider: "copilot" }),
+      ]),
+    ).toBe("copilot");
+  });
+
+  it("switches to another authenticated provider when the current one is not", () => {
+    expect(
+      getProviderForNewSession("codex", [
+        makeProviderStatus({
+          provider: "codex",
+          authStatus: "unauthenticated",
+          status: "error",
+        }),
+        makeProviderStatus({ provider: "copilot" }),
+      ]),
+    ).toBe("copilot");
+  });
+
+  it("keeps the current provider when no authenticated fallback exists", () => {
+    expect(
+      getProviderForNewSession("codex", [
+        makeProviderStatus({
+          provider: "codex",
+          authStatus: "unauthenticated",
+          status: "error",
+        }),
+        makeProviderStatus({
+          provider: "copilot",
+          authStatus: "unknown",
+          status: "warning",
+        }),
+      ]),
+    ).toBe("codex");
+  });
+});
+
+describe("getProviderPreflightError", () => {
+  it("returns the auth message for unauthenticated providers", () => {
+    expect(
+      getProviderPreflightError(
+        makeProviderStatus({
+          provider: "copilot",
+          authStatus: "unauthenticated",
+          status: "error",
+          message: "GitHub Copilot is not authenticated.",
+        }),
+      ),
+    ).toBe("GitHub Copilot is not authenticated.");
+  });
+
+  it("allows warning and unknown auth statuses", () => {
+    expect(
+      getProviderPreflightError(
+        makeProviderStatus({
+          provider: "codex",
+          authStatus: "unknown",
+          status: "warning",
+          message: "Could not verify Codex authentication status.",
+        }),
+      ),
+    ).toBeNull();
   });
 });

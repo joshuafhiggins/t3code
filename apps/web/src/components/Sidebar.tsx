@@ -31,6 +31,7 @@ import {
   DEFAULT_MODEL_BY_PROVIDER,
   type DesktopUpdateState,
   ProjectId,
+  type ServerProviderStatus,
   ThreadId,
   type GitStatusResult,
   type ResolvedKeybindingsConfig,
@@ -43,7 +44,11 @@ import { APP_STAGE_LABEL, APP_VERSION } from "../branding";
 import { isMacPlatform, newCommandId, newProjectId, newThreadId } from "../lib/utils";
 import { useStore } from "../store";
 import { isChatNewLocalShortcut, isChatNewShortcut, shortcutLabelForCommand } from "../keybindings";
-import { derivePendingApprovals, derivePendingUserInputs } from "../session-logic";
+import {
+  derivePendingApprovals,
+  derivePendingUserInputs,
+  getProviderForNewSession,
+} from "../session-logic";
 import { gitRemoveWorktreeMutationOptions, gitStatusQueryOptions } from "../lib/gitReactQuery";
 import { serverConfigQueryOptions } from "../lib/serverReactQuery";
 import { readNativeApi } from "../nativeApi";
@@ -86,6 +91,7 @@ import { isNonEmpty as isNonEmptyString } from "effect/String";
 import { resolveThreadStatusPill, shouldClearThreadSelectionOnMouseDown } from "./Sidebar.logic";
 
 const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
+const EMPTY_PROVIDER_STATUSES: ServerProviderStatus[] = [];
 const THREAD_PREVIEW_LIMIT = 6;
 
 async function copyTextToClipboard(text: string): Promise<void> {
@@ -274,16 +280,20 @@ export default function Sidebar() {
     (store) => store.clearProjectDraftThreadById,
   );
   const navigate = useNavigate();
-  const isOnSettings = useLocation({ select: (loc) => loc.pathname === "/settings" });
+  const isOnSettings = useLocation({
+    select: (loc) => loc.pathname === "/settings",
+  });
   const { settings: appSettings } = useAppSettings();
   const routeThreadId = useParams({
     strict: false,
     select: (params) => (params.threadId ? ThreadId.makeUnsafe(params.threadId) : null),
   });
-  const { data: keybindings = EMPTY_KEYBINDINGS } = useQuery({
-    ...serverConfigQueryOptions(),
-    select: (config) => config.keybindings,
-  });
+  const serverConfigQuery = useQuery(serverConfigQueryOptions());
+  const keybindings = serverConfigQuery.data?.keybindings ?? EMPTY_KEYBINDINGS;
+  const providerStatuses = serverConfigQuery.data?.providers ?? EMPTY_PROVIDER_STATUSES;
+  const routeThreadDraftProvider = useComposerDraftStore((store) =>
+    routeThreadId ? (store.draftsByThreadId[routeThreadId]?.provider ?? null) : null,
+  );
   const queryClient = useQueryClient();
   const removeWorktreeMutation = useMutation(gitRemoveWorktreeMutationOptions({ queryClient }));
   const [addingProject, setAddingProject] = useState(false);
@@ -314,6 +324,14 @@ export default function Sidebar() {
     () => new Map(projects.map((project) => [project.id, project.cwd] as const)),
     [projects],
   );
+  const routeThread = useMemo(
+    () => (routeThreadId ? (threads.find((thread) => thread.id === routeThreadId) ?? null) : null),
+    [routeThreadId, threads],
+  );
+  const providerForNewSession = useMemo(() => {
+    const currentProvider = routeThread?.session?.provider ?? routeThreadDraftProvider ?? "codex";
+    return getProviderForNewSession(currentProvider, providerStatuses);
+  }, [providerStatuses, routeThread?.session?.provider, routeThreadDraftProvider]);
   const threadGitTargets = useMemo(
     () =>
       threads.map((thread) => ({
@@ -440,6 +458,9 @@ export default function Sidebar() {
           envMode: options?.envMode ?? "local",
           runtimeMode: DEFAULT_RUNTIME_MODE,
         });
+        if (providerForNewSession !== "codex") {
+          useComposerDraftStore.getState().setProvider(threadId, providerForNewSession);
+        }
 
         await navigate({
           to: "/$threadId",
@@ -451,6 +472,7 @@ export default function Sidebar() {
       clearProjectDraftThreadId,
       getDraftThreadByProjectId,
       navigate,
+      providerForNewSession,
       getDraftThread,
       routeThreadId,
       setDraftThreadContext,
@@ -589,7 +611,10 @@ export default function Sidebar() {
 
       const trimmed = newTitle.trim();
       if (trimmed.length === 0) {
-        toastManager.add({ type: "warning", title: "Thread title cannot be empty" });
+        toastManager.add({
+          type: "warning",
+          title: "Thread title cannot be empty",
+        });
         finishRename();
         return;
       }
