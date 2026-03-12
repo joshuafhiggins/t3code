@@ -55,10 +55,6 @@ import {
   getProviderForNewSession,
   getPreferredAuthenticatedProvider,
   getProviderPreflightError,
-  type PendingApproval,
-  type PendingUserInput,
-  type ProviderPickerKind,
-  PROVIDER_OPTIONS,
   deriveWorkLogEntries,
   hasToolActivityForTurn,
   isLatestTurnSettled,
@@ -220,7 +216,6 @@ function getProviderOptionsForDispatch(input: {
     },
   };
 }
-
 
 interface ChatViewProps {
   threadId: ThreadId;
