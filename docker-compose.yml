@@ -1,0 +1,13 @@
+services:
+  t3code-remote:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3773:3773"
+    volumes:
+      - t3code-state:/workspace/.t3code-state
+    restart: unless-stopped
+
+volumes:
+  t3code-state:
