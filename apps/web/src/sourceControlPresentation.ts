@@ -40,6 +40,12 @@ export function getSourceControlPresentation(
         terminology: getChangeRequestTerminology(provider),
         Icon: GitLabIcon,
       };
+    case "forgejo":
+      return {
+        providerName: provider?.name || presentation.providerName,
+        terminology: getChangeRequestTerminology(provider),
+        Icon: GitPullRequestIcon,
+      };
     case "azure-devops":
       return {
         providerName: provider?.name || presentation.providerName,

@@ -13,6 +13,7 @@ import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as AzureDevOpsCli from "./AzureDevOpsCli.ts";
 import * as BitbucketApi from "./BitbucketApi.ts";
+import * as ForgejoCli from "./ForgejoCli.ts";
 import * as GitHubCli from "./GitHubCli.ts";
 import * as GitLabCli from "./GitLabCli.ts";
 import * as SourceControlProviderRegistry from "./SourceControlProviderRegistry.ts";
@@ -90,6 +91,7 @@ function makeRegistry(input: {
         processLayer,
         Layer.mock(AzureDevOpsCli.AzureDevOpsCli)({}),
         Layer.mock(BitbucketApi.BitbucketApi)({}),
+        Layer.mock(ForgejoCli.ForgejoCli)({}),
         Layer.mock(GitHubCli.GitHubCli)({}),
         Layer.mock(GitLabCli.GitLabCli)({}),
         ServerConfig.layerTest(process.cwd(), {
@@ -173,6 +175,40 @@ it.effect("routes GitLab remotes to the GitLab provider", () =>
     const provider = yield* registry.resolve({ cwd: "/repo" });
 
     assert.strictEqual(provider.kind, "gitlab");
+  }),
+);
+
+it.effect("routes Codeberg remotes to the Forgejo provider", () =>
+  Effect.gen(function* () {
+    const registry = yield* makeRegistry({
+      remotes: [{ name: "origin", url: "git@codeberg.org:group/project.git" }],
+    });
+
+    const provider = yield* registry.resolve({ cwd: "/repo" });
+
+    assert.strictEqual(provider.kind, "forgejo");
+  }),
+);
+
+it.effect("routes authenticated self-hosted Forgejo remotes without relying on host naming", () =>
+  Effect.gen(function* () {
+    const registry = yield* makeRegistry({
+      remotes: [{ name: "origin", url: "https://forge.example.test/group/project.git" }],
+      process: {
+        run: (input) =>
+          input.command === "forgejo-cli"
+            ? Effect.succeed(
+                processOutput("Logged in to forge.example.test as forgejo-user\n", {
+                  exitCode: ChildProcessSpawner.ExitCode(0),
+                }),
+              )
+            : Effect.succeed(processOutput("")),
+      },
+    });
+
+    const provider = yield* registry.resolve({ cwd: "/repo" });
+
+    assert.strictEqual(provider.kind, "forgejo");
   }),
 );
 

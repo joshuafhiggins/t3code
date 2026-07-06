@@ -19,6 +19,10 @@ describe("source control presentation", () => {
       shortLabel: "PR",
       singular: "pull request",
     });
+    expect(getChangeRequestTerminologyForKind("forgejo")).toEqual({
+      shortLabel: "PR",
+      singular: "pull request",
+    });
     expect(getChangeRequestTerminologyForKind("azure-devops")).toEqual({
       shortLabel: "PR",
       singular: "pull request",
@@ -52,6 +56,9 @@ describe("detectSourceControlProviderFromRemoteUrl", () => {
     expect(
       detectSourceControlProviderFromRemoteUrl("https://dev.azure.com/org/project/_git/repo")?.kind,
     ).toBe("azure-devops");
+    expect(
+      detectSourceControlProviderFromRemoteUrl("https://codeberg.org/group/repo.git")?.kind,
+    ).toBe("forgejo");
     expect(
       detectSourceControlProviderFromRemoteUrl("git@bitbucket.org:workspace/repo.git")?.kind,
     ).toBe("bitbucket");

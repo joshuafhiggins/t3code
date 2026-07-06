@@ -1,6 +1,6 @@
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
-export type SourceControlIconKind = "github" | "gitlab" | "bitbucket" | "azure-devops";
+export type SourceControlIconKind = "github" | "gitlab" | "forgejo" | "bitbucket" | "azure-devops";
 
 export function SourceControlIcon(props: {
   readonly kind: SourceControlIconKind;
@@ -39,6 +39,18 @@ export function SourceControlIcon(props: {
           <Path
             d="M6.44 15.3a14.71 14.71 0 0 0-5.86-2.63l-.05.12a8.1 8.1 0 0 0 2.68 9.34l.02.01.04.03 6.63 4.97 6.1-4.6-9.56-7.24Z"
             fill="#FC6D26"
+          />
+        </Svg>
+      );
+    case "forgejo":
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M6 3.75a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Zm0 0v16.5m0 0a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Zm12 0a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Zm0-4.5V9.5A3.5 3.5 0 0 0 14.5 6H11"
+            stroke={props.color ?? "#F97316"}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </Svg>
       );

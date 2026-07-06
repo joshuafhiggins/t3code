@@ -17,7 +17,15 @@ import type {
 } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import * as Option from "effect/Option";
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ElementType,
+} from "react";
 import { flushSync } from "react-dom";
 import {
   CheckIcon,
@@ -26,6 +34,7 @@ import {
   ExternalLinkIcon,
   GitBranchPlusIcon,
   GitCommitIcon,
+  GitPullRequestIcon,
   InfoIcon,
   LockIcon,
   GlobeIcon,
@@ -107,7 +116,7 @@ interface PendingDefaultBranchAction {
 
 type PublishProviderKind = Extract<
   SourceControlProviderKind,
-  "github" | "gitlab" | "bitbucket" | "azure-devops"
+  "github" | "gitlab" | "forgejo" | "bitbucket" | "azure-devops"
 >;
 
 type GitActionToastId = ReturnType<typeof toastManager.add>;
@@ -172,6 +181,14 @@ const PUBLISH_PROVIDER_OPTIONS = [
     Icon: GitLabIcon,
   },
   {
+    value: "forgejo",
+    label: "Forgejo",
+    description: "codeberg.org",
+    host: "codeberg.org",
+    pathPlaceholder: "owner/repo",
+    Icon: GitPullRequestIcon,
+  },
+  {
     value: "bitbucket",
     label: "Bitbucket",
     description: "bitbucket.org",
@@ -193,7 +210,7 @@ const PUBLISH_PROVIDER_OPTIONS = [
   readonly description: string;
   readonly host: string;
   readonly pathPlaceholder: string;
-  readonly Icon: typeof GitHubIcon;
+  readonly Icon: ElementType<{ className?: string }>;
 }>;
 
 function publishProviderOption(provider: PublishProviderKind) {
@@ -405,6 +422,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
     const accounts: Record<PublishProviderKind, string | null> = {
       github: null,
       gitlab: null,
+      forgejo: null,
       bitbucket: null,
       "azure-devops": null,
     };

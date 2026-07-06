@@ -55,9 +55,12 @@ const EMPTY_DISCOVERY_RESULT: SourceControlDiscoveryResult = {
   sourceControlProviders: [],
 };
 
+const ForgejoProviderIcon: Icon = (props) => <GitPullRequestIcon {...props} />;
+
 const SOURCE_CONTROL_PROVIDER_ICONS: Partial<Record<SourceControlProviderKind, Icon>> = {
   github: GitHubIcon,
   gitlab: GitLabIcon,
+  forgejo: ForgejoProviderIcon,
   "azure-devops": AzureDevOpsIcon,
   bitbucket: BitbucketIcon,
 };

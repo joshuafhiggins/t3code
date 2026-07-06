@@ -11,6 +11,7 @@ import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as AzureDevOpsCli from "./AzureDevOpsCli.ts";
 import * as BitbucketApi from "./BitbucketApi.ts";
+import * as ForgejoCli from "./ForgejoCli.ts";
 import * as GitHubCli from "./GitHubCli.ts";
 import * as GitLabCli from "./GitLabCli.ts";
 import * as SourceControlDiscovery from "./SourceControlDiscovery.ts";
@@ -28,6 +29,7 @@ const sourceControlProviderRegistryTestLayer = (input: {
         }).pipe(Layer.provide(NodeServices.layer)),
         Layer.mock(AzureDevOpsCli.AzureDevOpsCli)({}),
         Layer.mock(BitbucketApi.BitbucketApi)(input.bitbucket),
+        Layer.mock(ForgejoCli.ForgejoCli)({}),
         Layer.mock(GitHubCli.GitHubCli)({}),
         Layer.mock(GitLabCli.GitLabCli)({}),
         Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({}),
@@ -150,6 +152,12 @@ it.effect("reports implemented tools separately from locally available executabl
           account: Option.none(),
         },
         {
+          kind: "forgejo",
+          status: "missing",
+          auth: "unknown",
+          account: Option.none(),
+        },
+        {
           kind: "azure-devops",
           status: "missing",
           auth: "unknown",
@@ -201,6 +209,9 @@ it.effect("probes provider authentication without exposing token details", () =>
 Logged in to gitlab.com as gitlab-user
 `),
         );
+      }
+      if (input.command === "forgejo-cli" && input.args.join(" ") === "auth status") {
+        return Effect.succeed(processOutput("Logged in to codeberg.org as forgejo-user\n"));
       }
       if (
         input.command === "az" &&
@@ -263,6 +274,12 @@ Logged in to gitlab.com as gitlab-user
           kind: "gitlab",
           auth: "authenticated",
           account: Option.some("gitlab-user"),
+          detail: Option.none(),
+        },
+        {
+          kind: "forgejo",
+          auth: "authenticated",
+          account: Option.some("forgejo-user"),
           detail: Option.none(),
         },
         {

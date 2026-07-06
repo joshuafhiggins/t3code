@@ -1,7 +1,7 @@
 import type { SourceControlProviderInfo, SourceControlProviderKind } from "@t3tools/contracts";
 
 export interface ChangeRequestPresentation {
-  readonly icon: "github" | "gitlab" | "azure-devops" | "bitbucket" | "change-request";
+  readonly icon: "github" | "gitlab" | "forgejo" | "azure-devops" | "bitbucket" | "change-request";
   readonly providerName: string;
   readonly shortName: string;
   readonly longName: string;
@@ -41,6 +41,17 @@ const GITLAB_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
   providerLongName: "GitLab merge request",
   checkoutCommandExample: "glab mr checkout 123",
   urlExample: "https://gitlab.com/group/project/-/merge_requests/42",
+};
+
+const FORGEJO_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
+  icon: "forgejo",
+  providerName: "Forgejo",
+  shortName: "PR",
+  longName: "pull request",
+  pluralLongName: "pull requests",
+  providerLongName: "Forgejo pull request",
+  checkoutCommandExample: "forgejo-cli pr checkout 123",
+  urlExample: "https://codeberg.org/owner/repo/pulls/42",
 };
 
 const AZURE_DEVOPS_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
@@ -83,6 +94,8 @@ export function resolveChangeRequestPresentation(
       return GITHUB_CHANGE_REQUEST_PRESENTATION;
     case "gitlab":
       return GITLAB_CHANGE_REQUEST_PRESENTATION;
+    case "forgejo":
+      return FORGEJO_CHANGE_REQUEST_PRESENTATION;
     case "azure-devops":
       return AZURE_DEVOPS_CHANGE_REQUEST_PRESENTATION;
     case "bitbucket":
@@ -175,6 +188,10 @@ function isGitLabHost(host: string): boolean {
   return host === "gitlab.com" || host.includes("gitlab");
 }
 
+function isForgejoHost(host: string): boolean {
+  return host === "codeberg.org" || host.includes("forgejo");
+}
+
 function isAzureDevOpsHost(host: string): boolean {
   return host === "dev.azure.com" || host.endsWith(".visualstudio.com");
 }
@@ -204,6 +221,14 @@ export function detectSourceControlProviderFromRemoteUrl(
     return {
       kind: "gitlab",
       name: hostname === "gitlab.com" ? "GitLab" : "GitLab Self-Hosted",
+      baseUrl: toBaseUrl(host),
+    };
+  }
+
+  if (isForgejoHost(hostname)) {
+    return {
+      kind: "forgejo",
+      name: hostname === "codeberg.org" ? "Codeberg" : "Forgejo Self-Hosted",
       baseUrl: toBaseUrl(host),
     };
   }
