@@ -11,6 +11,7 @@ import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as AzureDevOpsCli from "./AzureDevOpsCli.ts";
 import * as BitbucketApi from "./BitbucketApi.ts";
+import * as GiteaCli from "./GiteaCli.ts";
 import * as GitHubCli from "./GitHubCli.ts";
 import * as GitLabCli from "./GitLabCli.ts";
 import * as SourceControlDiscovery from "./SourceControlDiscovery.ts";
@@ -28,6 +29,7 @@ const sourceControlProviderRegistryTestLayer = (input: {
         }).pipe(Layer.provide(NodeServices.layer)),
         Layer.mock(AzureDevOpsCli.AzureDevOpsCli)({}),
         Layer.mock(BitbucketApi.BitbucketApi)(input.bitbucket),
+        Layer.mock(GiteaCli.GiteaCli)({}),
         Layer.mock(GitHubCli.GitHubCli)({}),
         Layer.mock(GitLabCli.GitLabCli)({}),
         Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({}),
@@ -150,6 +152,12 @@ it.effect("reports implemented tools separately from locally available executabl
           account: Option.none(),
         },
         {
+          kind: "gitea",
+          status: "missing",
+          auth: "unknown",
+          account: Option.none(),
+        },
+        {
           kind: "azure-devops",
           status: "missing",
           auth: "unknown",
@@ -200,6 +208,16 @@ it.effect("probes provider authentication without exposing token details", () =>
           processOutput(`gitlab.com
 Logged in to gitlab.com as gitlab-user
 `),
+        );
+      }
+      if (input.command === "tea" && input.args.join(" ") === "whoami --output json") {
+        return Effect.succeed(
+          processOutput(
+            JSON.stringify({
+              login: "gitea-user",
+              html_url: "https://gitea.example.test/gitea-user",
+            }),
+          ),
         );
       }
       if (
@@ -263,6 +281,12 @@ Logged in to gitlab.com as gitlab-user
           kind: "gitlab",
           auth: "authenticated",
           account: Option.some("gitlab-user"),
+          detail: Option.none(),
+        },
+        {
+          kind: "gitea",
+          auth: "authenticated",
+          account: Option.some("gitea-user"),
           detail: Option.none(),
         },
         {

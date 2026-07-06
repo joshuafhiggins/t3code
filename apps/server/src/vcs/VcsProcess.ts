@@ -58,6 +58,8 @@ const classifyNonZeroExit = (command: string, stderr: string): VcsProcessExitFai
     normalized.includes("not logged in") ||
     normalized.includes("gh auth login") ||
     normalized.includes("glab auth login") ||
+    normalized.includes("tea login add") ||
+    normalized.includes("no gitea login") ||
     normalized.includes("az devops login") ||
     normalized.includes("please run az login") ||
     normalized.includes("no oauth token") ||
@@ -74,6 +76,11 @@ const classifyNonZeroExit = (command: string, stderr: string): VcsProcessExitFai
         normalized.includes("pull request not found"))) ||
     (command === "glab" &&
       (normalized.includes("merge request not found") ||
+        normalized.includes("not found") ||
+        normalized.includes("404"))) ||
+    (command === "tea" &&
+      (normalized.includes("pull request not found") ||
+        normalized.includes("pull not found") ||
         normalized.includes("not found") ||
         normalized.includes("404"))) ||
     (command === "az" &&

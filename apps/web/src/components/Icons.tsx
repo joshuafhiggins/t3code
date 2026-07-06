@@ -89,6 +89,33 @@ export const GitLabIcon: Icon = (props) => (
   </svg>
 );
 
+export const GiteaIcon: Icon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M4.4 9.2h10.8v4.1a5.4 5.4 0 0 1-10.8 0V9.2Z"
+      fill="#609926"
+      stroke="#428F29"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M15.2 10.5h1.9a2.3 2.3 0 0 1 0 4.6h-1.9"
+      stroke="#428F29"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+    <path
+      d="M8.4 10.4v2.1a1.7 1.7 0 0 0 1.7 1.7h1.5"
+      stroke="#fff"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path d="M11.6 14.2v2.2" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" />
+    <path d="M3.3 18.7h13.6" stroke="#6B4F2A" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
 export const AzureDevOpsIcon: Icon = (props) => {
   const id = useId().replaceAll(":", "");
   const gradientA = `${id}-azure-a`;

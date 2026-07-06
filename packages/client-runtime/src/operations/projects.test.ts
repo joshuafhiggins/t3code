@@ -8,6 +8,9 @@ import {
 import * as Option from "effect/Option";
 
 import {
+  addProjectRemoteSourceLabel,
+  addProjectRemoteSourcePathHint,
+  addProjectRemoteSourceProvider,
   buildAddProjectRemoteSourceReadiness,
   buildProjectCreateCommand,
   findExistingAddProject,
@@ -22,6 +25,12 @@ describe("add project shared logic", () => {
     expect(getAddProjectInitialQuery("")).toBe("~/");
     expect(getAddProjectInitialQuery("/work")).toBe("/work/");
     expect(getAddProjectInitialQuery("C:\\work")).toBe("C:\\work\\");
+  });
+
+  it("describes Gitea as an add-project source control provider", () => {
+    expect(addProjectRemoteSourceLabel("gitea")).toBe("Gitea");
+    expect(addProjectRemoteSourcePathHint("gitea")).toBe("owner/repo");
+    expect(addProjectRemoteSourceProvider("gitea")).toBe("gitea");
   });
 
   it("rejects unsupported windows paths on non-windows environments", () => {
@@ -79,14 +88,29 @@ describe("add project shared logic", () => {
             detail: Option.some("Run glab auth login"),
           },
         },
+        {
+          kind: "gitea",
+          label: "Gitea",
+          status: "available",
+          installHint: "Install tea",
+          version: Option.some("1.0.0"),
+          detail: Option.none(),
+          auth: {
+            status: "authenticated",
+            account: Option.some("tea-user"),
+            host: Option.some("gitea.com"),
+            detail: Option.none(),
+          },
+        },
       ],
     };
 
     const readiness = buildAddProjectRemoteSourceReadiness(discovery);
     expect(readiness.url.ready).toBe(true);
     expect(readiness.github.ready).toBe(true);
+    expect(readiness.gitea.ready).toBe(true);
     expect(readiness.gitlab).toEqual({ ready: false, hint: "Run glab auth login" });
-    expect(sortAddProjectProviderSources(readiness)[0]).toBe("github");
+    expect(sortAddProjectProviderSources(readiness).slice(0, 2)).toEqual(["github", "gitea"]);
   });
 
   it("finds existing projects by normalized path in the target environment", () => {

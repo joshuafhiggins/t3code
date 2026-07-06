@@ -1,6 +1,6 @@
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
-export type SourceControlIconKind = "github" | "gitlab" | "bitbucket" | "azure-devops";
+export type SourceControlIconKind = "github" | "gitlab" | "gitea" | "bitbucket" | "azure-devops";
 
 export function SourceControlIcon(props: {
   readonly kind: SourceControlIconKind;
@@ -40,6 +40,33 @@ export function SourceControlIcon(props: {
             d="M6.44 15.3a14.71 14.71 0 0 0-5.86-2.63l-.05.12a8.1 8.1 0 0 0 2.68 9.34l.02.01.04.03 6.63 4.97 6.1-4.6-9.56-7.24Z"
             fill="#FC6D26"
           />
+        </Svg>
+      );
+    case "gitea":
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M4.4 9.2h10.8v4.1a5.4 5.4 0 0 1-10.8 0V9.2Z"
+            fill="#609926"
+            stroke="#428F29"
+            strokeWidth={1.4}
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M15.2 10.5h1.9a2.3 2.3 0 0 1 0 4.6h-1.9"
+            stroke="#428F29"
+            strokeWidth={1.4}
+            strokeLinecap="round"
+          />
+          <Path
+            d="M8.4 10.4v2.1a1.7 1.7 0 0 0 1.7 1.7h1.5"
+            stroke="#fff"
+            strokeWidth={1.4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path d="M11.6 14.2v2.2" stroke="#fff" strokeWidth={1.4} strokeLinecap="round" />
+          <Path d="M3.3 18.7h13.6" stroke="#6B4F2A" strokeWidth={1.5} strokeLinecap="round" />
         </Svg>
       );
     case "azure-devops":

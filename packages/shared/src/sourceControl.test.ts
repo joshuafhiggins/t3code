@@ -19,6 +19,10 @@ describe("source control presentation", () => {
       shortLabel: "PR",
       singular: "pull request",
     });
+    expect(getChangeRequestTerminologyForKind("gitea")).toEqual({
+      shortLabel: "PR",
+      singular: "pull request",
+    });
     expect(getChangeRequestTerminologyForKind("azure-devops")).toEqual({
       shortLabel: "PR",
       singular: "pull request",
@@ -49,6 +53,9 @@ describe("detectSourceControlProviderFromRemoteUrl", () => {
     expect(
       detectSourceControlProviderFromRemoteUrl("https://gitlab.com/group/repo.git")?.kind,
     ).toBe("gitlab");
+    expect(detectSourceControlProviderFromRemoteUrl("https://gitea.com/group/repo.git")?.kind).toBe(
+      "gitea",
+    );
     expect(
       detectSourceControlProviderFromRemoteUrl("https://dev.azure.com/org/project/_git/repo")?.kind,
     ).toBe("azure-devops");
